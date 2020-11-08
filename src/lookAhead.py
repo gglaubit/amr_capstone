@@ -1,14 +1,8 @@
 #!/usr/bin/env python
 
-import sys  # for redirecting output in bash, could be removed
-# import time # for sleeping - time.sleep is commented out below right now
-import os
+import sys
 import rospy
-import argparse
-import subprocess
-from subprocess import Popen
 import psutil
-import time
 from geometry_msgs.msg import Twist
 import numpy as np
 import keras
@@ -22,27 +16,15 @@ y = 0.0
 v = 0.0
 yaw = 0.0
 
-environments = {0.009: "ice_009",
-                0.09: "ice_09",
-                0.9: "ice_9",
-                1: "control",
-                1000: "mud",
-                0.05: "ice_05",
-                0.5: "ice_5",
-                0.02: "ice_02",
-                0.2: "ice_2",
-                0.07: "ice_07",
-                0.7: "ice_7"}
-
 model = keras.models.load_model('/home/bezzo/catkin_ws/src/capstone_nodes/NNet_all_tf_210.h5', custom_objects={
     'Normalization': keras.layers.experimental.preprocessing.Normalization()})
 
+
 def statesCallback(data):
     global x, y, v, yaw
-    # find index of slash
+    # find index of jackal
     name = data.name
     index = name.index("jackal")
-    # index = name.index("/")
     x = data.pose[index].position.x
     y = data.pose[index].position.y
     v = data.twist[index].linear.x
@@ -56,36 +38,26 @@ def statesCallback(data):
     yaw = euler[2]
 
 
-def terminate_process_and_children(p):
-    import psutil
-    process = psutil.Process(p.pid)
-    for sub_process in process.children(recursive=True):
-        sub_process.send_signal(signal.SIGINT)
-    # p.wait()  # we wait for children to terminate
-    p.terminate()
-
-
-def signal_process_and_children(pid, signal_to_send, wait=False):
-    process = psutil.Process(pid)
-    for children in process.children(recursive=True):
-        if signal_to_send == 'suspend':
-            children.suspend()
-        elif signal_to_send == 'resume':
-            children.resume()
-        else:
-            children.send_signal(signal_to_send)
-    if wait:
-        process.wait()
-
-
-def terminate_ros_node():
-    list_cmd = subprocess.Popen("rosnode list", shell=True, stdout=subprocess.PIPE)
-    list_output = list_cmd.stdout.read()
-    retcode = list_cmd.wait()
-    assert retcode == 0, "List command returned %d" % retcode
-    for str in list_output.split("\n"):
-        # if (str.startswith(s)):
-        os.system("rosnode kill " + str)
+def calculate_mu(run):
+    if run <= 120:
+        return 0.009
+    elif 120 < run <= 240:
+        return 0.09
+    elif 240 < run <= 360:
+        return 1
+    elif 360 < run <= 480:
+        return 0.05
+    elif 480 < run <= 600:
+        return 0.5
+    elif 600 < run <= 720:
+        return 0.02
+    elif 720 < run <= 840:
+        return 0.2
+    elif 840 < run <= 960:
+        return 0.07
+    elif 960 < run:
+        return 0.7
+    return None
 
 
 def robotUnsafe(robx, roby, path):
@@ -126,7 +98,6 @@ def getLookAheadPoint(waypoints, robx, roby, lookAheadDistance, lastIndex, lastF
         discriminant = sqrt(discriminant)
         t1 = (-b - discriminant) / (2 * a)
         t2 = (-b + discriminant) / (2 * a)
-        # print('t guys', t1, t2)
         if 0 <= t1 <= 1 and j + t1 > lastFractionalIndex:
             return (E[0] + t1 * d[0], E[1] + t1 * d[1]), j, j + t1
         if 0 <= t2 <= 1 and j + t2 > lastFractionalIndex:
@@ -175,10 +146,10 @@ def smoothPath(path):  # path is [(x1, y1), ..., (xend, yend)]
 
 
 def vel_pid(vg, vc, dt):
-    v_goal = vg # output of neural net in m/s
-    v_curr = vc # current velocity in m/s
+    v_goal = vg  # output of neural net in m/s
+    v_curr = vc  # current velocity in m/s
     prev_err = 0.0
-    windup_guard = 10 # needs to be changed??
+    windup_guard = 10  # needs to be changed??
     kp = 1
     ki = 0.1
     kd = 0.1
@@ -190,7 +161,7 @@ def vel_pid(vg, vc, dt):
         i = windup_guard
     elif i > windup_guard:
         i = windup_guard
-    d = 0.0 # use acceleration calculated above??
+    d = 0.0  # use acceleration calculated above??
     if delta_time > 0:
         d = delta_error/dt
     prev_err = error
@@ -198,11 +169,15 @@ def vel_pid(vg, vc, dt):
     return vel
 
 
-# def main(velocity, angle_deg, log_file, run_num):
-def main(angle_deg, run_num):
+def stop_robot(vel_msg, velocity_publisher):
+    vel_msg.linear.x = 0
+    vel_msg.angular.z = 0
+    velocity_publisher.publish(vel_msg)
+
+
+def main(angle_deg):
     velocity_publisher = rospy.Publisher('/jackal_velocity_controller/cmd_vel', Twist, queue_size=10)
     rospy.Subscriber('/gazebo/model_states', ModelStates, statesCallback)
-    info = "{lin_vel}, {ang_vel}, {angle}, {deviation}\n"
     rate = rospy.Rate(10)
     vel_msg = Twist()
     angle = radians(angle_deg)  # in radians
@@ -214,33 +189,26 @@ def main(angle_deg, run_num):
     path = smoothPath(p)
     lookAheadDistance = 2
     lastIndex = 0
-    # lastLookAheadIndex = 0
     lastFractionalIndex = 0
     lookAheadPoint = waypoints[0]
     atGoalHack = 0  # needs to be fixed
-    start_angle = yaw
-    # i = 0
+
     # this is kind of a cop out, we should fix this later
     fut_velocities = [0.3]*len(path)
     pred_vels = [0, 0, 0, 0, 0]
-
 
     while not rospy.is_shutdown():
         path = injectPoints(waypoints2)
         unsafe, robot_deviation, closest_index = robotUnsafe(x, y, path)
         if unsafe:
             print("unsafe")
-            vel_msg.linear.x = 0
-            vel_msg.angular.z = 0
-            velocity_publisher.publish(vel_msg)
+            stop_robot(vel_msg, velocity_publisher)
             print(fut_velocities)
             break
 
         if robotAtGoal(x, y, waypoints[-1][0], waypoints[-1][1]) and lastIndex == len(waypoints) - 1:
             print("at goal:", x, y)
-            vel_msg.linear.x = 0
-            vel_msg.angular.z = 0
-            velocity_publisher.publish(vel_msg)
+            stop_robot(vel_msg, velocity_publisher)
             print(fut_velocities)
             break
 
@@ -260,21 +228,14 @@ def main(angle_deg, run_num):
             except IndexError as e:
                 horizon_point1 = path[-2]
                 horizon_point2 = path[-1]
-            # Estimate angle from starting pose
-            #a = atan2(horizon_point2[1] - horizon_point1[1], horizon_point2[0] - horizon_point1[0]) - start_angle
             # estimate angle from current pose
             a = atan2(horizon_point2[1] - horizon_point1[1], horizon_point2[0] - horizon_point1[0]) - yaw
             ang = abs(degrees(a))
             fut_velocity = model.predict([[mu, ang]])[0][0]
             pred_vels[horizon] = fut_velocity
             horizon = horizon + 1
-        # Current Measure of Safety is slowest but how will that be with more complex systems
+        # current measure of safety is slowest but how will that be with more complex systems
         vel = min(pred_vels)
-        #if (closest_index + horizon) < len(fut_velocities):
-            #fut_velocities[closest_index + horizon] = fut_velocity
-        #test = fut_velocities[closest_index - 1]
-        #print(test)
-        #print(ang)
 
         # linear velocity in the x-axis:
         vel_msg.linear.x = vel
@@ -291,22 +252,11 @@ def main(angle_deg, run_num):
         rate.sleep()
         atGoalHack += 1
 
-        # writing to the log file
-        # log_file.write(info.format(lin_vel=vel_msg.linear.x, ang_vel=vel_msg.angular.z,
-        #                           angle=angle_deg, deviation=robot_deviation))
-
-    # log_file.close()
     print("kill me")
     sys.stdout.flush()
     # time.sleep(20)
     raw_input("")  # kill 0 sent from bash script not working, so you have to ctrl-c manually
 
-    # terminate_process_and_children(proc)
-    # signal_process_and_children(proc.pid, signal.SIGINT, True)
-    # terminate_ros_node()
-    # proc.send_signal(subprocess.signal.SIGINT)
-    # proc.kill()
-    # proc.terminate()
     for process in psutil.process_iter():
         print(process.cmdline())
 
@@ -314,48 +264,12 @@ def main(angle_deg, run_num):
 if __name__ == "__main__":
     rospy.init_node('capstone_nodes', anonymous=True)
 
-    # get run number
     run = 246
     angle = 45
     # run = rospy.get_param('~run')
     # angle = rospy.get_param('~angle')
-    run_num = str(run)
 
-    # automatically calculate angle
-    # automatically calculate mu
-    mu = 0
-    if run <= 120:
-        mu = 0.009
-    elif 120 < run <= 240:
-        mu = 0.09
-    elif 240 < run <= 360:
-        mu = 1
-    elif 360 < run <= 480:
-        mu = 0.05
-    elif 480 < run <= 600:
-        mu = 0.5
-    elif 600 < run <= 720:
-        mu = 0.02
-    elif 720 < run <= 840:
-        mu = 0.2
-    elif 840 < run <= 960:
-        mu = 0.07
-    elif 960 < run:
-        mu = 0.7
-
-    # use neural network to choose velocity
-
+    mu = calculate_mu(run)
     # velocity = model.predict([[mu, angle]])[0][0]
-    # velocity = 1.0
-    env = environments[mu]
 
-    # bag_location = "bagfiles/trainingData" + args.run_num
-
-    # log_file = "../logs/{run}_{env}_{vel}_{angle}.txt".format(run=run_num, env=env, vel=str(velocity), angle=str(angle)) # this needs to be fixed, right now you run test.sh from the bagfiles directory
-    # file format: velocity, angle, path_deviation
-    # file = open(log_file, "w")
-
-    # print("velocity: ", velocity, "angle: ", angle)
-    # print(angle, args.angle)
-    # main(velocity, angle, file, run_num)
-    main(angle, run_num)
+    main(angle)

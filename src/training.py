@@ -1,18 +1,11 @@
 #!/usr/bin/env python
 
-import sys # for redirecting output in bash, could be removed
-#import time # for sleeping - time.sleep is commented out below right now
+import sys
 import os
 import rospy
-import argparse
-import subprocess
 import datetime
-from subprocess import Popen
-import psutil
-import time
 from geometry_msgs.msg import Twist
 import numpy as np
-# import keras
 from nav_msgs.msg import Odometry
 from gazebo_msgs.msg import ModelStates
 from math import pow, atan2, sqrt, ceil, sin, cos, pi, radians
@@ -23,22 +16,12 @@ y = 0.0
 v = 0.0
 yaw = 0.0
 
-environments = {0.009: "ice_009", 
-                0.09: "ice_09", 
-                0.9: "ice_9", 
-                1: "control", 
-                1000: "mud",
-                0.05: "ice_05",
-                0.5: "ice_5"}
-
-
 
 def statesCallback(data):
     global x, y, v, yaw
-    # find index of slash
+    # find index of jackal
     name = data.name
     index = name.index("jackal")
-    # index = name.index("/")
     x = data.pose[index].position.x
     y = data.pose[index].position.y
     v = data.twist[index].linear.x
@@ -52,48 +35,52 @@ def statesCallback(data):
     yaw = euler[2]
 
 
-def terminate_process_and_children(p):
-    import psutil
-    process = psutil.Process(p.pid)
-    for sub_process in process.children(recursive=True):
-        sub_process.send_signal(signal.SIGINT)
-    # p.wait()  # we wait for children to terminate
-    p.terminate()
+def calculate_mu(run):
+    # 0.2,.5,1,1.5,2,2.5,3,3.5,4,5
+    if run <= 240:
+        return 0.009
+    elif 240 < run <= 480:
+        return 0.09
+    elif 480 < run <= 600:
+        return 1
+    elif 600 < run <= 840:
+        return 0.05
+    elif 840 < run:
+        return 0.5
+    return None
 
 
-def signal_process_and_children(pid, signal_to_send, wait=False):
-    process = psutil.Process(pid)
-    for children in process.children(recursive=True):
-        if signal_to_send == 'suspend':
-            children.suspend()
-        elif signal_to_send == 'resume':
-            children.resume()
-        else:
-            children.send_signal(signal_to_send)
-    if wait:
-        process.wait()
+def calculate_velocity(run):
+    if run % 10 == 1:
+        return 0.2
+    elif run % 10 == 2:
+        return 0.4
+    elif run % 10 == 3:
+        return 0.6
+    elif run % 10 == 4:
+        return 0.8
+    elif run % 10 == 5:
+        return 1.0
+    elif run % 10 == 6:
+        return 1.2
+    elif run % 10 == 7:
+        return 1.4
+    elif run % 10 == 8:
+        return 1.6
+    elif run % 10 == 9:
+        return 1.8
+    elif run % 10 == 0:
+        return 2.0
+    return None
 
-def terminate_ros_node():
-    list_cmd = subprocess.Popen("rosnode list", shell=True, stdout=subprocess.PIPE)
-    list_output = list_cmd.stdout.read()
-    retcode = list_cmd.wait()
-    assert retcode == 0, "List command returned %d" % retcode
-    for str in list_output.split("\n"):
-        #if (str.startswith(s)):
-        os.system("rosnode kill " + str)
 
-
-#def robotUnsafe(robx, roby, path):
 def robotUnsafe(robx, roby, path, safety_tolerance):
     dists = [0]*len(path)
     i = 0
     for point in path:
         dists[i] = sqrt(pow((point[0] - robx), 2) + pow((point[1] - roby), 2))
-        #print(i)
         i = i+1
-    #print(dists)
     val = min(dists)
-    #print(val)
     return val > safety_tolerance, val
 
 
@@ -123,7 +110,6 @@ def getLookAheadPoint(waypoints, robx, roby, lookAheadDistance, lastIndex, lastF
         discriminant = sqrt(discriminant)
         t1 = (-b - discriminant) / (2 * a)
         t2 = (-b + discriminant) / (2 * a)
-        # print('t guys', t1, t2)
         if 0 <= t1 <= 1 and j + t1 > lastFractionalIndex:
             return (E[0] + t1 * d[0], E[1] + t1 * d[1]), j, j + t1
         if 0 <= t2 <= 1 and j + t2 > lastFractionalIndex:
@@ -148,10 +134,8 @@ def injectPoints(waypoints):
         vector = (vector[0] / d * spacing, vector[1] / d * spacing)
         for i in range(0, num_points_that_fit):
             new_list = (start_point[0] + vector[0] * i, start_point[1] + vector[1] * i)
-            #print(new_list)
             new_points.append(new_list)
         new_points.append(end_point)
-    #print(new_points)
     return new_points
 
 
@@ -173,66 +157,56 @@ def smoothPath(path):  # path is [(x1, y1), ..., (xend, yend)]
     return newPath
 
 
-#def main(velocity, angle_deg, run_num):
-def main(velocity, angle_deg, run_num, safety_threshold):
+def stop_robot(vel_msg, velocity_publisher):
+    vel_msg.linear.x = 0
+    vel_msg.angular.z = 0
+    velocity_publisher.publish(vel_msg)
+
+
+def main(velocity, angle_deg, safety_threshold):
     velocity_publisher = rospy.Publisher('/jackal_velocity_controller/cmd_vel', Twist, queue_size=10)
     rospy.Subscriber('/gazebo/model_states', ModelStates, statesCallback)
-    info = "{lin_vel}, {ang_vel}, {angle}, {deviation}\n"
     rate = rospy.Rate(10)
     vel_msg = Twist()
     angle = radians(angle_deg)  # in radians
     branching_point = (10, 0)
     end_point = (branching_point[0] + 10*cos(angle), 10*sin(angle))
     print(end_point)
-    # waypoints = [(10, 0), (0, 10), (10, 10), (0, 0)]
     waypoints = [branching_point, end_point]
     waypoints2 = [(0, 0), branching_point, end_point]
     path = injectPoints(waypoints2)
-    path = smoothPath(path)
     lookAheadDistance = 2
     lastIndex = 0
-    # lastLookAheadIndex = 0
     lastFractionalIndex = 0
     lookAheadPoint = waypoints[0]
     atGoalHack = 0  # needs to be fixed
-    # i = 0
 
     begin = datetime.datetime.now()
     time_to_stop = 4  # in minutes
- 
 
     while not rospy.is_shutdown():
         path = injectPoints(waypoints2)
-        #unsafe, robot_deviation = robotUnsafe(x, y, path)
         unsafe, robot_deviation = robotUnsafe(x, y, path, safety_threshold)
         if unsafe:
             print("unsafe")
-            vel_msg.linear.x = 0
-            vel_msg.angular.z = 0
-            velocity_publisher.publish(vel_msg)
+            stop_robot(vel_msg, velocity_publisher)
             break
 
         if robotAtGoal(x, y, waypoints[-1][0], waypoints[-1][1]) and lastIndex == len(waypoints) - 1:
-        #if robotAtGoal(x, y, waypoints[-1][0], waypoints[-1][1]) and lastIndex == len(waypoints) - 1 and atGoalHack>100:
             print("at goal:", x, y)
-            vel_msg.linear.x = 0
-            vel_msg.angular.z = 0
-            velocity_publisher.publish(vel_msg)
+            stop_robot(vel_msg, velocity_publisher)
+            break
+
+        now = datetime.datetime.now()
+        # will stop program if robot hasn't found goal or become unsafe after time_to_stop minutes
+        if begin + datetime.timedelta(minutes=time_to_stop) < now:
+            print("timed out")
+            stop_robot(vel_msg, velocity_publisher)
             break
 
         lookAheadPoint, lastIndex, lastFractionalIndex = getLookAheadPoint(waypoints, x, y, lookAheadDistance,
                                                                            lastIndex, lastFractionalIndex,
                                                                            lookAheadPoint)
-        
-        # will stop program if robot hasn't found goal or become unsafe after 4 minutes       
-        now = datetime.datetime.now()        
-        if begin + datetime.timedelta(minutes = time_to_stop) < now:
-            print("timed out")
-            vel_msg.linear.x = 0
-            vel_msg.angular.z = 0
-            velocity_publisher.publish(vel_msg)
-            break
-            
 
         goal_pose_x = lookAheadPoint[0]
         goal_pose_y = lookAheadPoint[1]
@@ -263,65 +237,14 @@ def main(velocity, angle_deg, run_num, safety_threshold):
 
 if __name__ == "__main__":
     rospy.init_node('capstone_nodes', anonymous=True)
-    
-    # get run number
+
     run = rospy.get_param('~run')
     angle = rospy.get_param('~angle')
     safety_threshold = rospy.get_param('~safety_threshold')
-    run_num=str(run)
-    
-    # automatically calculate velocity
-    if run % 10 == 1:
-        velocity = 0.2
-    elif run % 10 == 2:
-    	velocity = 0.4
-    elif run % 10 == 3:
-        velocity = 0.6
-    elif run % 10 == 4:
-        velocity = 0.8
-    elif run % 10 == 5:
-        velocity = 1.0
-    elif run % 10 == 6:
-    	velocity = 1.2
-    elif run % 10 == 7:
-        velocity = 1.4
-    elif run % 10 == 8:
-        velocity = 1.6
-    elif run % 10 == 9:
-        velocity = 1.8
-    elif run % 10 == 0:
-        velocity = 2.0
-        
-    # automatically calculate angle
-    # automatically calculate mu
-    	'''
-    mu = 0
-    if run <= 1200: #0.2,.5,1,1.5,2,2.5,3,3.5,4,5
-        mu = 0.009
-    elif 1200 < run <= 2400:
-        mu = 0.09
-    elif 2400 < run <= 4800:
-        mu = 1
-    elif 4800 < run <= 6000:
-        mu = 0.05
-    elif 6000 < run:
-        mu = 0.5
-    '''
-    mu = 0
-    if run <= 240: #0.2,.5,1,1.5,2,2.5,3,3.5,4,5
-        mu = 0.009
-    elif 240 < run <= 480:
-        mu = 0.09
-    elif 480 < run <= 600:
-        mu = 1
-    elif 600 < run <= 840:
-        mu = 0.05
-    elif 840 < run:
-        mu = 0.5
-    env = environments[mu]
+    mu = calculate_mu(run)
+    velocity = calculate_velocity(run)
 
     print("velocity: ", velocity, "angle: ", angle)
-    #main(velocity, angle, run_num)
-    main(velocity, angle, run_num, safety_threshold)
+    main(velocity, angle, safety_threshold)
 
 

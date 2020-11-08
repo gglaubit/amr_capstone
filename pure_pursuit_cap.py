@@ -5,7 +5,7 @@ from geometry_msgs.msg import Twist
 import numpy as np
 from nav_msgs.msg import Odometry
 from gazebo_msgs.msg import ModelStates
-from math import pow, atan2, sqrt, ceil, sin, cos, pi
+from math import pow, atan2, sqrt, ceil, sin, cos, pi, radians
 from tf.transformations import euler_from_quaternion
 
 x = 0.0
@@ -16,10 +16,9 @@ yaw = 0.0
 
 def statesCallback(data):
     global x, y, v, yaw
-    # find index of slash
+    # find index of jackal
     name = data.name
     index = name.index("jackal")
-    # index = name.index("/")
     x = data.pose[index].position.x
     y = data.pose[index].position.y
     v = data.twist[index].linear.x
@@ -38,7 +37,7 @@ def robotUnsafe(robx, roby, path):
     dists = [0]*len(path)
     i = 0
     for point in path:
-        dists[i] = qrt(pow((point[0] - robx), 2) + pow((point[1] - roby), 2))
+        dists[i] = sqrt(pow((point[0] - robx), 2) + pow((point[1] - roby), 2))
     val = min(dists)
     return val > safety_tolerance
 
@@ -117,37 +116,36 @@ def smoothPath(path):  # path is [(x1, y1), ..., (xend, yend)]
     return newPath
 
 
+def stop_robot(vel_msg, velocity_publisher):
+    vel_msg.linear.x = 0
+    vel_msg.angular.z = 0
+    velocity_publisher.publish(vel_msg)
+
+
 def main():
     rospy.init_node('pure_pursuit_cap', anonymous=True)
     velocity_publisher = rospy.Publisher('/jackal_velocity_controller/cmd_vel', Twist, queue_size=10)
-    # velocity_publisher = rospy.Publisher('/husky_velocity_controller/cmd_vel', Twist, queue_size=10)
     rospy.Subscriber('/gazebo/model_states', ModelStates, statesCallback)
     rate = rospy.Rate(10)
     vel_msg = Twist()
     angle = radians(20)
     branching_point = (10, 0)
     end_point = (branching_point[0] + 10*cos(angle), 10*sin(angle))
-    #waypoints = [(10, 0), (0, 10), (10, 10), (0, 0)]
     waypoints = [branching_point, end_point]
     path = injectPoints(waypoints)
     lookAheadDistance = 2
     lastIndex = 0
-    lastLookAheadIndex = 0
     lastFractionalIndex = 0
     lookAheadPoint = waypoints[0]
-    i = 0
+
     while not rospy.is_shutdown():
 
         if robotUnsafe (x, y, path):
-            vel_msg.linear.x = 0
-            vel_msg.angular.z = 0
-            velocity_publisher.publish(vel_msg)
+            stop_robot(vel_msg, velocity_publisher)
             break
 
         if robotAtGoal(x, y, waypoints[-1][0], waypoints[-1][1]) and lastIndex == len(waypoints) - 1:
-            vel_msg.linear.x = 0
-            vel_msg.angular.z = 0
-            velocity_publisher.publish(vel_msg)
+            stop_robot(vel_msg, velocity_publisher)
             break
 
         lookAheadPoint, lastIndex, lastFractionalIndex = getLookAheadPoint(waypoints, x, y, lookAheadDistance,
