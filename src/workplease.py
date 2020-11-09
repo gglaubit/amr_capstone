@@ -35,7 +35,7 @@ environments = {0.009: "ice_009",
                 0.7: "ice_7"}
 
 model = keras.models.load_model('/home/bezzo/catkin_ws/src/capstone_nodes/NNet_all_tf_210.h5', custom_objects={
-    'Normalization': keras.layers.experimental.preprocessing.Normalization()})
+    'Normalization': keras.layers.experimental.preprocessing.Normalization()}, compile=False)
 
 
 def statesCallback(data):
