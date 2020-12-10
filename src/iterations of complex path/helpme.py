@@ -8,13 +8,14 @@ from geometry_msgs.msg import Twist
 import numpy as np
 from nav_msgs.msg import Odometry
 from gazebo_msgs.msg import ModelStates
-from math import pow, atan2, sqrt, ceil, sin, cos, pi, radians
+from math import pow, atan2, sqrt, ceil, sin, cos, pi, radians, degrees
 from tf.transformations import euler_from_quaternion
 import argparse
 import subprocess
 from subprocess import Popen
 import psutil
 import time
+import keras
 import csv
 
 x = 0.0
@@ -22,6 +23,8 @@ y = 0.0
 v = 0.0
 yaw = 0.0
 
+model = keras.models.load_model('/home/bezzo/catkin_ws/src/capstone_nodes/NNet_all(3).h5', custom_objects={
+    'Normalization': keras.layers.experimental.preprocessing.Normalization()}, compile=False)
 
 def statesCallback(data):
     global x, y, v, yaw
@@ -42,15 +45,15 @@ def statesCallback(data):
 
 
 def calculate_mu(run):
-    if run <= 120:
+    if run <= 600:
         return 0.009
-    elif 121 < run <= 240:
+    elif 600 < run <= 1200:
         return 0.09
-    elif 241 < run <= 360:
+    elif 1200 < run <= 1800:
         return 1
-    elif 361 < run <= 480:
+    elif 1800 < run <= 2400:
         return 0.05
-    elif 481 < run:
+    elif 2400 < run:
         return 0.5
     return None
 
@@ -86,7 +89,8 @@ def robotUnsafe(robx, roby, path, safety_tolerance):
         dists[i] = sqrt(pow((point[0] - robx), 2) + pow((point[1] - roby), 2))
         i = i+1
     val = min(dists)
-    return val > safety_tolerance, val
+    closest_index = dists.index(val)
+    return val > safety_tolerance, val, closest_index
 
 
 def robotAtGoal(robx, roby, goalx, goaly):
@@ -95,16 +99,36 @@ def robotAtGoal(robx, roby, goalx, goaly):
     return val <= distance_tolerance
 
 
-def getLookAheadPoint(path, robx, roby, lastLookAhead):
-    dx = [robx - pathx[0] for pathx in path]
-    dy = [roby - pathy[1] for pathy in path]
-    d = np.hypot(dx, dy)
-    target_idx = np.argmin(d) + 30
-    if target_idx <= lastLookAhead:
-        target_idx = lastLookAhead + 1
-    if target_idx > (len(path) - 1):
-        target_idx = (len(path) - 1)
-    return target_idx
+def getLookAheadPoint(waypoints, robx, roby, lookAheadDistance, lastIndex, lastFractionalIndex, lastLookAhead):
+    for j in range(lastIndex, len(waypoints) - 1):
+        E = waypoints[j]
+        L = waypoints[j + 1]
+        C = (robx, roby)
+        r = lookAheadDistance
+        d = (L[0] - E[0], L[1] - E[1])
+        f = (E[0] - C[0], E[1] - C[1])
+        a = np.dot(d, d)
+        b = np.dot(np.multiply(2, f), d)
+        c = np.dot(f, f) - r * r
+        discriminant = b * b - 4 * a * c
+
+        # this happens on the first waypoint, since the lookahead distance is smaller
+        if discriminant < 0:
+            return lastLookAhead, lastIndex, lastFractionalIndex
+
+        discriminant = sqrt(discriminant)
+        t1 = (-b - discriminant) / (2 * a)
+        t2 = (-b + discriminant) / (2 * a)
+        if 0 <= t1 <= 1 and j + t1 > lastFractionalIndex:
+            return (E[0] + t1 * d[0], E[1] + t1 * d[1]), j, j + t1
+        if 0 <= t2 <= 1 and j + t2 > lastFractionalIndex:
+            return (E[0] + t2 * d[0], E[1] + t2 * d[1]), j, j + t2
+
+        # this happens on the last waypoint. I'm not sure if j should be updated on the two
+        # return statements above? or if this solution is best - we should figure out why
+        # lookahead points aren't working for the first and last waypoint
+        return waypoints[lastIndex + 1], j + 1, lastFractionalIndex
+    return waypoints[-1], lastIndex, lastFractionalIndex
 
 
 def injectPoints(waypoints):
@@ -160,21 +184,24 @@ def main(velocity, angle_deg, safety_threshold):
     waypoints = [branching_point, end_point]
     waypoints2 = [(0, 0), branching_point, end_point]
     path = injectPoints(waypoints2)
-    lastLookAhead = 0
+    lookAheadDistance = 0.5
+    lastIndex = 0
+    lastFractionalIndex = 0
+    lookAheadPoint = waypoints[0]
     atGoalHack = 0  # needs to be fixed
-
+    pred_vels = [0]*4
     begin = datetime.datetime.now()
-    time_to_stop = 3  # in minutes
+    time_to_stop = 23  # in minutes
 
     while not rospy.is_shutdown():
         path = injectPoints(waypoints2)
-        unsafe, robot_deviation = robotUnsafe(x, y, path, safety_threshold)
+        unsafe, robot_deviation, closest_index = robotUnsafe(x, y, path, safety_threshold)
         if unsafe:
             print("unsafe")
             stop_robot(vel_msg, velocity_publisher)
             break
 
-        if robotAtGoal(x, y, waypoints[-1][0], waypoints[-1][1]) and lastLookAhead == len(path) - 1:
+        if robotAtGoal(x, y, waypoints[-1][0], waypoints[-1][1], 1) and lastIndex == len(path) - 1:
             print("at goal:", x, y)
             stop_robot(vel_msg, velocity_publisher)
             break
@@ -186,20 +213,36 @@ def main(velocity, angle_deg, safety_threshold):
             stop_robot(vel_msg, velocity_publisher)
             break
 
-        target_index = getLookAheadPoint(path, x, y, lastLookAhead)
-        lookAheadPoint = path[target_index]
-        lastLookAhead = target_index  # lookAheadIndex
+        if robotAtGoal(x, y, goal_pose_x, goal_pose_y, 1):
+        lookAheadPoint, lastIndex, lastFractionalIndex = getLookAheadPoint(path, x, y, lookAheadDistance,
+                                                                           lastIndex, lastFractionalIndex,
+                                                                           lookAheadPoint)
+
         goal_pose_x = lookAheadPoint[0]
         goal_pose_y = lookAheadPoint[1]
-
-        theta_d = atan2(goal_pose_y - y, goal_pose_x - x)
-        theta_diff = theta_d - yaw
-        ang_vel = atan2(sin(theta_diff), cos(theta_diff))
-
-        if ang_vel < -(pi / 2):
-            ang_vel = -pi / 2
-        elif ang_vel > pi / 2:
-            ang_vel = pi / 2
+        #print(lookAheadPoint)
+        
+        horizon = 0
+        while horizon < 4:
+            try:
+                horizon_point1 = path[closest_index + horizon]
+                horizon_point2 = path[closest_index + horizon + 1]
+            except IndexError as e:
+                horizon_point1 = path[-2]
+                horizon_point2 = path[-1]
+            a = atan2(horizon_point2[1] - horizon_point1[1], horizon_point2[0] - horizon_point1[0]) - yaw
+            ang = abs(degrees(a))
+            fut_velocity = model.predict([[mu, ang, safety_threshold]])[0][0]
+            pred_vels[horizon] = fut_velocity
+            horizon = horizon + 1
+        # Current Measure of Safety is slowest but how will that be with more complex systems
+        velocity = min(pred_vels)
+        
+        ang_vel = (atan2(goal_pose_y - y, goal_pose_x - x) - yaw)
+        if ang_vel < -(pi/2):
+            ang_vel = -pi/2
+        elif ang_vel > pi/2:
+            ang_vel = pi/2
 
         # linear velocity in the x-axis:
         vel_msg.linear.x = velocity
@@ -210,6 +253,12 @@ def main(velocity, angle_deg, safety_threshold):
         vel_msg.angular.x = 0
         vel_msg.angular.y = 0
         vel_msg.angular.z = ang_vel
+        
+        lookAheadIndex = 0
+        a = 0
+        with open('helpme_data.csv', 'a') as csvfile:
+            csvwriter = csv.writer(csvfile, delimiter=',')
+            csvwriter.writerow([x, y, yaw, lookAheadIndex, goal_pose_x, goal_pose_y, velocity, a, (atan2(goal_pose_y - y, goal_pose_x - x) - yaw)])
 
         # publishing our vel_msg
         velocity_publisher.publish(vel_msg)
@@ -229,11 +278,15 @@ def main(velocity, angle_deg, safety_threshold):
 if __name__ == "__main__":
     rospy.init_node('capstone_nodes', anonymous=True)
 
-    run = rospy.get_param('~run')
-    angle = rospy.get_param('~angle')
-    safety_threshold = 4
-    mu = calculate_mu(run)
-    velocity = calculate_velocity(run)
+    #run = rospy.get_param('~run')
+    #angle = rospy.get_param('~angle')
+    #safety_threshold = rospy.get_param('~safety_threshold')
+    #mu = calculate_mu(run)
+    #velocity = calculate_velocity(run)
+    angle = 110
+    mu = 1
+    velocity = 1
+    safety_threshold = 2
     print("velocity: ", velocity, "angle: ", angle)
     main(velocity, angle, safety_threshold)
 

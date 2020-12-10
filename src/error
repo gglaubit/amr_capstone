@@ -1,0 +1,58 @@
+bash test.sh 0
+run 0
+[ INFO] [1603084453.014342051]: Subscribing to /gazebo/model_states
+[ INFO] [1603084453.017550879]: Subscribing to /imu/data
+[ INFO] [1603084453.020866854]: Subscribing to /odometry/filtered
+... logging to /home/bezzo/.ros/log/113ec1aa-10a6-11eb-82f7-f0d5bf9b4aba/roslaunch-bezzo-ThinkPad-P50-22665.log
+Checking log directory for disk usage. This may take awhile.
+Press Ctrl-C to interrupt
+Done checking log file disk usage. Usage is <1GB.
+
+[ INFO] [1603084453.286920754, 1519.691000000]: Recording to trainingData0.bag.
+Traceback (most recent call last):
+  File "/opt/ros/kinetic/lib/xacro/xacro", line 32, in <module>
+    import xacro
+  File "/opt/ros/kinetic/lib/python2.7/dist-packages/xacro/__init__.py", line 42, in <module>
+    from roslaunch import substitution_args
+  File "/opt/ros/kinetic/lib/python2.7/dist-packages/roslaunch/__init__.py", line 56, in <module>
+    from .launch import ROSLaunchRunner
+  File "/opt/ros/kinetic/lib/python2.7/dist-packages/roslaunch/launch.py", line 55, in <module>
+    from roslaunch.nodeprocess import create_master_process, create_node_process
+  File "/opt/ros/kinetic/lib/python2.7/dist-packages/roslaunch/nodeprocess.py", line 52, in <module>
+    from rosmaster.master_api import NUM_WORKERS
+  File "/opt/ros/kinetic/lib/python2.7/dist-packages/rosmaster/__init__.py", line 35, in <module>
+    from .main import rosmaster_main
+  File "/opt/ros/kinetic/lib/python2.7/dist-packages/rosmaster/main.py", line 43, in <module>
+    import rosmaster.master
+  File "/opt/ros/kinetic/lib/python2.7/dist-packages/rosmaster/master.py", line 47, in <module>
+    import rosmaster.master_api
+  File "/opt/ros/kinetic/lib/python2.7/dist-packages/rosmaster/master_api.py", line 72, in <module>
+    from rosmaster.util import xmlrpcapi
+  File "/opt/ros/kinetic/lib/python2.7/dist-packages/rosmaster/util.py", line 48, in <module>
+    from defusedxml.xmlrpc import monkey_patch
+ImportError: No module named defusedxml.xmlrpc
+while processing /home/bezzo/catkin_ws/src/cpr_gazebo/cpr_agriculture_gazebo/launch/spawn_jackal.launch:
+while processing /opt/ros/kinetic/share/jackal_gazebo/launch/spawn_jackal.launch:
+while processing /opt/ros/kinetic/share/jackal_description/launch/description.launch:
+Invalid <param> tag: Cannot load command parameter [robot_description]: command [/opt/ros/kinetic/lib/jackal_description/env_run                     /opt/ros/kinetic/share/jackal_description/urdf/configs/base                     /opt/ros/kinetic/lib/xacro/xacro /opt/ros/kinetic/share/jackal_description/urdf/jackal.urdf.xacro                     --inorder] returned with code [1]. 
+
+Param xml is <param command="$(find jackal_description)/scripts/$(arg env_runner)                     $(find jackal_description)/urdf/configs/$(arg config)                     $(find xacro)/xacro $(find jackal_description)/urdf/jackal.urdf.xacro                     --inorder" name="robot_description"/>
+The traceback for the exception was written to the log file
+Using TensorFlow backend.
+2020-10-19 01:14:19.054577: W tensorflow/stream_executor/platform/default/dso_loader.cc:55] Could not load dynamic library 'libnvinfer.so.6'; dlerror: libnvinfer.so.6: cannot open shared object file: No such file or directory; LD_LIBRARY_PATH: /home/bezzo/catkin_ws/devel/lib:/opt/ros/kinetic/lib:/opt/ros/kinetic/lib/x86_64-linux-gnu
+2020-10-19 01:14:19.054647: W tensorflow/stream_executor/platform/default/dso_loader.cc:55] Could not load dynamic library 'libnvinfer_plugin.so.6'; dlerror: libnvinfer_plugin.so.6: cannot open shared object file: No such file or directory; LD_LIBRARY_PATH: /home/bezzo/catkin_ws/devel/lib:/opt/ros/kinetic/lib:/opt/ros/kinetic/lib/x86_64-linux-gnu
+2020-10-19 01:14:19.054659: W tensorflow/compiler/tf2tensorrt/utils/py_utils.cc:30] Cannot dlopen some TensorRT libraries. If you would like to use Nvidia GPU with TensorRT, please make sure the missing libraries mentioned above are installed properly.
+Traceback (most recent call last):
+  File "/home/bezzo/catkin_ws/src/capstone_nodes/src/training.py", line 315, in <module>
+    model = keras.models.load_model('../../NNet_all.h5')
+  File "/home/bezzo/catkin_ws/src/capstone_nodes/nn_env/lib/python2.7/site-packages/keras/models.py", line 232, in load_model
+    model = model_from_config(model_config, custom_objects=custom_objects)
+  File "/home/bezzo/catkin_ws/src/capstone_nodes/nn_env/lib/python2.7/site-packages/keras/models.py", line 293, in model_from_config
+    return layer_module.deserialize(config, custom_objects=custom_objects)
+  File "/home/bezzo/catkin_ws/src/capstone_nodes/nn_env/lib/python2.7/site-packages/keras/layers/__init__.py", line 46, in deserialize
+    printable_module_name='layer')
+  File "/home/bezzo/catkin_ws/src/capstone_nodes/nn_env/lib/python2.7/site-packages/keras/utils/generic_utils.py", line 141, in deserialize_keras_object
+    return cls.from_config(config['config'])
+  File "/home/bezzo/catkin_ws/src/capstone_nodes/nn_env/lib/python2.7/site-packages/keras/models.py", line 1181, in from_config
+    if 'class_name' not in config[0] or config[0]['class_name'] == 'Merge':
+

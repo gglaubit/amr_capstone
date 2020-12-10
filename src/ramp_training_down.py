@@ -10,12 +10,6 @@ from nav_msgs.msg import Odometry
 from gazebo_msgs.msg import ModelStates
 from math import pow, atan2, sqrt, ceil, sin, cos, pi, radians
 from tf.transformations import euler_from_quaternion
-import argparse
-import subprocess
-from subprocess import Popen
-import psutil
-import time
-import csv
 
 x = 0.0
 y = 0.0
@@ -42,15 +36,15 @@ def statesCallback(data):
 
 
 def calculate_mu(run):
-    if run <= 120:
+    if run <= 600:
         return 0.009
-    elif 121 < run <= 240:
+    elif 600 < run <= 1200:
         return 0.09
-    elif 241 < run <= 360:
+    elif 1200 < run <= 1800:
         return 1
-    elif 361 < run <= 480:
+    elif 1800 < run <= 2400:
         return 0.05
-    elif 481 < run:
+    elif 2400 < run:
         return 0.5
     return None
 
@@ -95,20 +89,40 @@ def robotAtGoal(robx, roby, goalx, goaly):
     return val <= distance_tolerance
 
 
-def getLookAheadPoint(path, robx, roby, lastLookAhead):
-    dx = [robx - pathx[0] for pathx in path]
-    dy = [roby - pathy[1] for pathy in path]
-    d = np.hypot(dx, dy)
-    target_idx = np.argmin(d) + 30
-    if target_idx <= lastLookAhead:
-        target_idx = lastLookAhead + 1
-    if target_idx > (len(path) - 1):
-        target_idx = (len(path) - 1)
-    return target_idx
+def getLookAheadPoint(waypoints, robx, roby, lookAheadDistance, lastIndex, lastFractionalIndex, lastLookAhead):
+    for j in range(lastIndex, len(waypoints) - 1):
+        E = waypoints[j]
+        L = waypoints[j + 1]
+        C = (robx, roby)
+        r = lookAheadDistance
+        d = (L[0] - E[0], L[1] - E[1])
+        f = (E[0] - C[0], E[1] - C[1])
+        a = np.dot(d, d)
+        b = np.dot(np.multiply(2, f), d)
+        c = np.dot(f, f) - r * r
+        discriminant = b * b - 4 * a * c
+
+        # this happens on the first waypoint, since the lookahead distance is smaller
+        if discriminant < 0:
+            return lastLookAhead, lastIndex, lastFractionalIndex
+
+        discriminant = sqrt(discriminant)
+        t1 = (-b - discriminant) / (2 * a)
+        t2 = (-b + discriminant) / (2 * a)
+        if 0 <= t1 <= 1 and j + t1 > lastFractionalIndex:
+            return (E[0] + t1 * d[0], E[1] + t1 * d[1]), j, j + t1
+        if 0 <= t2 <= 1 and j + t2 > lastFractionalIndex:
+            return (E[0] + t2 * d[0], E[1] + t2 * d[1]), j, j + t2
+
+        # this happens on the last waypoint. I'm not sure if j should be updated on the two
+        # return statements above? or if this solution is best - we should figure out why
+        # lookahead points aren't working for the first and last waypoint
+        return waypoints[lastIndex + 1], j + 1, lastFractionalIndex
+    return waypoints[-1], lastIndex, lastFractionalIndex
 
 
 def injectPoints(waypoints):
-    spacing = 0.1
+    spacing = 0.5
     new_points = []
     for j in range(0, len(waypoints) - 1):
         start_point = waypoints[j]
@@ -125,7 +139,7 @@ def injectPoints(waypoints):
 
 
 def smoothPath(path):  # path is [(x1, y1), ..., (xend, yend)]
-    b = 0.9
+    b = 0.75
     a = 1 - b
     tolerance = 0.001
     newPath = [list(point) for point in path]  # tuples are immutable
@@ -154,17 +168,20 @@ def main(velocity, angle_deg, safety_threshold):
     rate = rospy.Rate(10)
     vel_msg = Twist()
     angle = radians(angle_deg)  # in radians
-    branching_point = (10, 0)
-    end_point = (branching_point[0] + 10*cos(angle), 10*sin(angle))
+    branching_point = (-10, 0)
+    end_point = (-14, 0)
     print(end_point)
     waypoints = [branching_point, end_point]
     waypoints2 = [(0, 0), branching_point, end_point]
     path = injectPoints(waypoints2)
-    lastLookAhead = 0
+    lookAheadDistance = 0.5
+    lastIndex = 0
+    lastFractionalIndex = 0
+    lookAheadPoint = waypoints[0]
     atGoalHack = 0  # needs to be fixed
 
     begin = datetime.datetime.now()
-    time_to_stop = 3  # in minutes
+    time_to_stop = 2  # in minutes
 
     while not rospy.is_shutdown():
         path = injectPoints(waypoints2)
@@ -174,7 +191,7 @@ def main(velocity, angle_deg, safety_threshold):
             stop_robot(vel_msg, velocity_publisher)
             break
 
-        if robotAtGoal(x, y, waypoints[-1][0], waypoints[-1][1]) and lastLookAhead == len(path) - 1:
+        if robotAtGoal(x, y, waypoints[-1][0], waypoints[-1][1]) and lastIndex == len(waypoints) - 1:
             print("at goal:", x, y)
             stop_robot(vel_msg, velocity_publisher)
             break
@@ -186,20 +203,12 @@ def main(velocity, angle_deg, safety_threshold):
             stop_robot(vel_msg, velocity_publisher)
             break
 
-        target_index = getLookAheadPoint(path, x, y, lastLookAhead)
-        lookAheadPoint = path[target_index]
-        lastLookAhead = target_index  # lookAheadIndex
+        lookAheadPoint, lastIndex, lastFractionalIndex = getLookAheadPoint(waypoints, x, y, lookAheadDistance,
+                                                                           lastIndex, lastFractionalIndex,
+                                                                           lookAheadPoint)
+
         goal_pose_x = lookAheadPoint[0]
         goal_pose_y = lookAheadPoint[1]
-
-        theta_d = atan2(goal_pose_y - y, goal_pose_x - x)
-        theta_diff = theta_d - yaw
-        ang_vel = atan2(sin(theta_diff), cos(theta_diff))
-
-        if ang_vel < -(pi / 2):
-            ang_vel = -pi / 2
-        elif ang_vel > pi / 2:
-            ang_vel = pi / 2
 
         # linear velocity in the x-axis:
         vel_msg.linear.x = velocity
@@ -209,7 +218,7 @@ def main(velocity, angle_deg, safety_threshold):
         # angular velocity in the z-axis:
         vel_msg.angular.x = 0
         vel_msg.angular.y = 0
-        vel_msg.angular.z = ang_vel
+        vel_msg.angular.z = 0
 
         # publishing our vel_msg
         velocity_publisher.publish(vel_msg)
@@ -220,10 +229,10 @@ def main(velocity, angle_deg, safety_threshold):
     print("Done.")
     sys.stdout.flush()
     
-    os.popen('killall -9 rosmaster')
-    os.popen('killall -9 roscore')
-    os.popen('killall -9 gzclient')
-    os.popen('killall -9 gzserver')
+    #os.popen('killall -9 rosmaster')
+    #os.popen('killall -9 roscore')
+    #os.popen('killall -9 gzclient')
+    #os.popen('killall -9 gzserver')
 
 
 if __name__ == "__main__":
@@ -231,9 +240,10 @@ if __name__ == "__main__":
 
     run = rospy.get_param('~run')
     angle = rospy.get_param('~angle')
-    safety_threshold = 4
+    safety_threshold = rospy.get_param('~safety_threshold')
     mu = calculate_mu(run)
     velocity = calculate_velocity(run)
+
     print("velocity: ", velocity, "angle: ", angle)
     main(velocity, angle, safety_threshold)
 

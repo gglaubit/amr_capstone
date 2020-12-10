@@ -16,11 +16,15 @@ from nav_msgs.msg import Odometry
 from gazebo_msgs.msg import ModelStates
 from math import pow, atan2, sqrt, ceil, sin, cos, pi, radians, degrees
 from tf.transformations import euler_from_quaternion
+import csv
 
 x = 0.0
 y = 0.0
 v = 0.0
 yaw = 0.0
+yaw2 = 0.0
+quat = 0.0
+quat2 = 0.0
 
 environments = {0.009: "ice_009",
                 0.09: "ice_09",
@@ -39,7 +43,7 @@ model = keras.models.load_model('/home/bezzo/catkin_ws/src/capstone_nodes/NNet_a
 
 
 def statesCallback(data):
-    global x, y, v, yaw
+    global x, y, v, yaw, quat
     # find index of slash
     name = data.name
     index = name.index("jackal")
@@ -55,6 +59,20 @@ def statesCallback(data):
     )
     euler = euler_from_quaternion(quaternion)
     yaw = euler[2]
+    quat = quaternion[3]
+
+
+def odomCallback(data):
+    global yaw2, quat2
+    quaternion = (
+        data.pose.pose.orientation.x,
+        data.pose.pose.orientation.y,
+        data.pose.pose.orientation.z,
+        data.pose.pose.orientation.w
+    )
+    euler = euler_from_quaternion(quaternion)
+    yaw2 = euler[2]
+    quat2 = quaternion[3]
 
 
 def terminate_process_and_children(p):
@@ -101,47 +119,26 @@ def robotUnsafe(robx, roby, path, tol):
     return val > safety_tolerance, val, closest_index
 
 
-def robotAtGoal(robx, roby, goalx, goaly):
-    distance_tolerance = 1
+def robotAtGoal(robx, roby, goalx, goaly, tol):
+    distance_tolerance = tol
     val = sqrt(pow((goalx - robx), 2) + pow((goaly - roby), 2))
     return val <= distance_tolerance
 
 
-def getLookAheadPoint(waypoints, robx, roby, lookAheadDistance, lastIndex, lastFractionalIndex, lastLookAhead):
-    for j in range(lastIndex, len(waypoints) - 1):
-        E = waypoints[j]
-        L = waypoints[j + 1]
-        C = (robx, roby)
-        r = lookAheadDistance
-        d = (L[0] - E[0], L[1] - E[1])
-        f = (E[0] - C[0], E[1] - C[1])
-        a = np.dot(d, d)
-        b = np.dot(np.multiply(2, f), d)
-        c = np.dot(f, f) - r * r
-        discriminant = b * b - 4 * a * c
-
-        # this happens on the first waypoint, since the lookahead distance is smaller
-        if discriminant < 0:
-            return lastLookAhead, lastIndex, lastFractionalIndex
-
-        discriminant = sqrt(discriminant)
-        t1 = (-b - discriminant) / (2 * a)
-        t2 = (-b + discriminant) / (2 * a)
-        # print('t guys', t1, t2)
-        if 0 <= t1 <= 1 and j + t1 > lastFractionalIndex:
-            return (E[0] + t1 * d[0], E[1] + t1 * d[1]), j, j + t1
-        if 0 <= t2 <= 1 and j + t2 > lastFractionalIndex:
-            return (E[0] + t2 * d[0], E[1] + t2 * d[1]), j, j + t2
-
-        # this happens on the last waypoint. I'm not sure if j should be updated on the two
-        # return statements above? or if this solution is best - we should figure out why
-        # lookahead points aren't working for the first and last waypoint
-        return waypoints[lastIndex + 1], j + 1, lastFractionalIndex
-    return waypoints[-1], lastIndex, lastFractionalIndex
+def getLookAheadPoint(path, robx, roby, lastLookAhead):
+    dx = [robx - pathx[0] for pathx in path]
+    dy = [roby - pathy[1] for pathy in path]
+    d = np.hypot(dx, dy)
+    target_idx = np.argmin(d) + 30
+    if target_idx <= lastLookAhead:
+        target_idx = lastLookAhead + 1
+    if target_idx > (len(path) - 1):
+        target_idx = (len(path) - 1)
+    return target_idx
 
 
-def injectPoints(waypoints):
-    spacing = 0.1
+def injectPoints(waypoints, space):
+    spacing = space
     new_points = []
     for j in range(0, len(waypoints) - 1):
         start_point = waypoints[j]
@@ -158,7 +155,7 @@ def injectPoints(waypoints):
 
 
 def smoothPath(path):  # path is [(x1, y1), ..., (xend, yend)]
-    b = 0.75
+    b = 0.9  # 0.75
     a = 1 - b
     tolerance = 0.001
     newPath = [list(point) for point in path]  # tuples are immutable
@@ -175,60 +172,35 @@ def smoothPath(path):  # path is [(x1, y1), ..., (xend, yend)]
     return newPath
 
 
-def vel_pid(vg, vc, dt):
-    v_goal = vg # output of neural net in m/s
-    v_curr = vc # current velocity in m/s
-    prev_err = 0.0
-    windup_guard = 10 # needs to be changed??
-    kp = 1
-    ki = 0.1
-    kd = 0.1
-    error = v_goal - v_curr
-    delta_error = error - prev_err
-    p = kp*error
-    i = i + error * dt
-    if i < -windup_guard:
-        i = windup_guard
-    elif i > windup_guard:
-        i = windup_guard
-    d = 0.0 # use acceleration calculated above??
-    if delta_time > 0:
-        d = delta_error/dt
-    prev_err = error
-    vel = p + ki*i + kd*d
-    return vel
-
-
-# def main(velocity, angle_deg, log_file, run_num, safety_tol):
-def main(angle_deg, run_num, safety_tol):
+def main(mu, safety_tol):
     velocity_publisher = rospy.Publisher('/jackal_velocity_controller/cmd_vel', Twist, queue_size=10)
     rospy.Subscriber('/gazebo/model_states', ModelStates, statesCallback)
+    rospy.Subscriber('/odometry/filtered', Odometry, odomCallback)
     info = "{lin_vel}, {ang_vel}, {angle}, {deviation}\n"
     rate = rospy.Rate(10)
     vel_msg = Twist()
-    angle = radians(angle_deg)  # in radians
+    angle = radians(45)  # in radians
     branching_point = (10, 0)
     end_point = (branching_point[0] + 10 * cos(angle), 10 * sin(angle))
-    waypoints = [branching_point, end_point]
-    waypoints2 = [(0, 0), branching_point, end_point]
-    p = injectPoints(waypoints2)
-    path = smoothPath(p)
-    lookAheadDistance = 2
-    lastIndex = 0
-    # lastLookAheadIndex = 0
-    lastFractionalIndex = 0
-    lookAheadPoint = waypoints[0]
-    atGoalHack = 0  # needs to be fixed
-    start_angle = yaw
-    # i = 0
-    # this is kind of a cop out, we should fix this later
-    fut_velocities = [0.3]*len(path)
-    pred_vels = [0]*5
-
+    #waypoints = [branching_point, end_point]
+    #waypoints2 = [(0, 0), branching_point, end_point]
+    waypoints = [(20,0), (20, 20), (0, 20), (0,0)]
+    waypoints2 = [(0,0), (20,0), (20, 20), (0, 20), (0,0)]
+    #waypoints = [(10, 0), (20, 10), (30, 10), (10, 20), (0, 0)]
+    #waypoints2 = [(0, 0), (10, 0), (20, 10), (30, 10), (10, 20), (0, 0)]
+    space = 0.1
+    path = injectPoints(waypoints2, space)
+    smooth_path = smoothPath(path)
+    atGoalHack = 0
+    pred_vels = [0] * 10
+    angles = [0] * 20
+    filename = "run_data.csv"
+    lastLookAhead = 0
+    csvinput = []
 
     while not rospy.is_shutdown():
-        path = injectPoints(waypoints2)
-        unsafe, robot_deviation, closest_index = robotUnsafe(x, y, path, safety_tol)
+        path = injectPoints(waypoints2, 0.1)
+        unsafe, robot_deviation, closest_index = robotUnsafe(x, y, smooth_path, safety_tol)
         if unsafe:
             print("unsafe")
             vel_msg.linear.x = 0
@@ -236,65 +208,73 @@ def main(angle_deg, run_num, safety_tol):
             velocity_publisher.publish(vel_msg)
             break
 
-        if robotAtGoal(x, y, waypoints[-1][0], waypoints[-1][1]) and lastIndex == len(waypoints) - 1:
+        if robotAtGoal(x, y, waypoints[-1][0], waypoints[-1][1], 1) and lastLookAhead == len(path) - 1:
             print("at goal:", x, y)
             vel_msg.linear.x = 0
             vel_msg.angular.z = 0
             velocity_publisher.publish(vel_msg)
             break
 
-        lookAheadPoint, lastIndex, lastFractionalIndex = getLookAheadPoint(waypoints, x, y, lookAheadDistance,
-                                                                           lastIndex, lastFractionalIndex,
-                                                                           lookAheadPoint)
+        target_index = getLookAheadPoint(path, x, y, lastLookAhead)
+        lookAheadPoint = path[target_index]
+        lastLookAhead = target_index  # lookAheadIndex
         goal_pose_x = lookAheadPoint[0]
         goal_pose_y = lookAheadPoint[1]
 
-        # mu = mu[horizon] ## This is just a general concept for when we don't have a constant mu
         horizon = 0
-        while horizon < 5:
-            # mu = mu[horizon] ## This is just a general concept for when we don't have a constant mu
+        while horizon < 10:
             try:
                 horizon_point1 = path[closest_index + horizon]
                 horizon_point2 = path[closest_index + horizon + 1]
             except IndexError as e:
                 horizon_point1 = path[-2]
                 horizon_point2 = path[-1]
-            # Estimate angle from starting pose
-            #a = atan2(horizon_point2[1] - horizon_point1[1], horizon_point2[0] - horizon_point1[0]) - start_angle
-            # estimate angle from current pose
-            a = atan2(horizon_point2[1] - horizon_point1[1], horizon_point2[0] - horizon_point1[0]) - yaw
+            a = abs(atan2(horizon_point2[1] - horizon_point1[1], horizon_point2[0] - horizon_point1[0])) - abs(yaw)
             ang = abs(degrees(a))
+            angles[horizon] = ang
             fut_velocity = model.predict([[mu, ang, safety_tol]])[0][0]
             pred_vels[horizon] = fut_velocity
             horizon = horizon + 1
         # Current Measure of Safety is slowest but how will that be with more complex systems
         vel = min(pred_vels)
-        print(vel)
-        #if (closest_index + horizon) < len(fut_velocities):
-            #fut_velocities[closest_index + horizon] = fut_velocity
-        #test = fut_velocities[closest_index - 1]
-        #print(test)
-        #print(ang)
+        anglee = angles[pred_vels.index(vel)]
+
+        theta_d = atan2(goal_pose_y - y, goal_pose_x - x)
+        theta_diff = theta_d - yaw
+        ang_vel = atan2(sin(theta_diff), cos(theta_diff))
+
+        if ang_vel < -(pi / 2):
+            ang_vel = -pi / 2
+        elif ang_vel > pi / 2:
+            ang_vel = pi / 2
 
         # linear velocity in the x-axis:
-        vel_msg.linear.x = vel
+        vel_msg.linear.x = 1 #vel
         vel_msg.linear.y = 0
         vel_msg.linear.z = 0
 
         # angular velocity in the z-axis:
         vel_msg.angular.x = 0
         vel_msg.angular.y = 0
-        vel_msg.angular.z = 2 * (atan2(goal_pose_y - y, goal_pose_x - x) - yaw)
+        vel_msg.angular.z = 1 * ang_vel
+
+        print(vel, anglee)
+
+        csvinput.append([x, y, yaw, target_index, goal_pose_x, goal_pose_y, vel, anglee, ang_vel, abs(yaw),
+                         atan2(goal_pose_y - y, goal_pose_x - x)])
+        with open(filename, 'a') as csvfile:
+            csvwriter = csv.writer(csvfile, delimiter=',')
+            csvwriter.writerow([x, y, yaw, target_index, goal_pose_x, goal_pose_y, vel, anglee, ang_vel, abs(yaw),
+                                atan2(goal_pose_y - y, goal_pose_x - x)])
 
         # publishing our vel_msg
         velocity_publisher.publish(vel_msg)
         rate.sleep()
         atGoalHack += 1
 
-        # writing to the log file
-        # log_file.write(info.format(lin_vel=vel_msg.linear.x, ang_vel=vel_msg.angular.z,
-        #                           angle=angle_deg, deviation=robot_deviation))
-
+    with open('after.csv', 'w') as csvfile:
+        csvwriter = csv.writer(csvfile, delimiter=',')
+        csvwriter.writerows(csvinput)
     # log_file.close()
     print("kill me")
     sys.stdout.flush()
@@ -313,50 +293,7 @@ def main(angle_deg, run_num, safety_tol):
 
 if __name__ == "__main__":
     rospy.init_node('capstone_nodes', anonymous=True)
-
-    # get run number
-    run = 12
-    angle = 45
-    # run = rospy.get_param('~run')
-    # angle = rospy.get_param('~angle')
-    run_num = str(run)
-    safety_tol = 2
-
-    # automatically calculate angle
-    # automatically calculate mu
-    mu = 0
-    if run <= 120:
-        mu = 0.009
-    elif 120 < run <= 240:
-        mu = 0.09
-    elif 240 < run <= 360:
-        mu = 1
-    elif 360 < run <= 480:
-        mu = 0.05
-    elif 480 < run <= 600:
-        mu = 0.5
-    elif 600 < run <= 720:
-        mu = 0.02
-    elif 720 < run <= 840:
-        mu = 0.2
-    elif 840 < run <= 960:
-        mu = 0.07
-    elif 960 < run:
-        mu = 0.7
-
-    # use neural network to choose velocity
-
-    # velocity = model.predict([[mu, angle]])[0][0]
-    # velocity = 1.0
+    mu = 1 #rospy.get_param('~mu')
+    safety_tol = 2.5
     env = environments[mu]
-
-    # bag_location = "bagfiles/trainingData" + args.run_num
-
-    # log_file = "../logs/{run}_{env}_{vel}_{angle}.txt".format(run=run_num, env=env, vel=str(velocity), angle=str(angle)) # this needs to be fixed, right now you run test.sh from the bagfiles directory
-    # file format: velocity, angle, path_deviation
-    # file = open(log_file, "w")
-
-    # print("velocity: ", velocity, "angle: ", angle)
-    # print(angle, args.angle)
-    # main(velocity, angle, file, run_num)
-    main(angle, run_num, safety_tol)
+    main(mu, safety_tol)
