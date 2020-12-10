@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 
 import sys
-import os
 import rospy
-import datetime
+import psutil
 from geometry_msgs.msg import Twist
 import numpy as np
+import keras
 from nav_msgs.msg import Odometry
 from gazebo_msgs.msg import ModelStates
 from math import pow, atan2, sqrt, ceil, sin, cos, pi, radians
@@ -16,6 +16,8 @@ y = 0.0
 v = 0.0
 yaw = 0.0
 
+model = keras.models.load_model('/home/bezzo/catkin_ws/src/capstone_nodes/NNet_all_tf_210.h5', custom_objects={
+    'Normalization': keras.layers.experimental.preprocessing.Normalization()})
 
 def statesCallback(data):
     global x, y, v, yaw
@@ -36,52 +38,37 @@ def statesCallback(data):
 
 
 def calculate_mu(run):
-    # 0.2,.5,1,1.5,2,2.5,3,3.5,4,5
-    if run <= 240:
+    if run <= 120:
         return 0.009
-    elif 240 < run <= 480:
+    elif 120 < run <= 240:
         return 0.09
-    elif 480 < run <= 600:
+    elif 240 < run <= 360:
         return 1
-    elif 600 < run <= 840:
+    elif 360 < run <= 480:
         return 0.05
-    elif 840 < run:
+    elif 480 < run <= 600:
         return 0.5
-    return None
-
-
-def calculate_velocity(run):
-    if run % 10 == 1:
+    elif 600 < run <= 720:
+        return 0.02
+    elif 720 < run <= 840:
         return 0.2
-    elif run % 10 == 2:
-        return 0.4
-    elif run % 10 == 3:
-        return 0.6
-    elif run % 10 == 4:
-        return 0.8
-    elif run % 10 == 5:
-        return 1.0
-    elif run % 10 == 6:
-        return 1.2
-    elif run % 10 == 7:
-        return 1.4
-    elif run % 10 == 8:
-        return 1.6
-    elif run % 10 == 9:
-        return 1.8
-    elif run % 10 == 0:
-        return 2.0
+    elif 840 < run <= 960:
+        return 0.07
+    elif 960 < run:
+        return 0.7
     return None
 
 
-def robotUnsafe(robx, roby, path, safety_tolerance):
-    dists = [0]*len(path)
+def robotUnsafe(robx, roby, path):
+    safety_tolerance = 2
+    dists = [0] * len(path)
     i = 0
     for point in path:
         dists[i] = sqrt(pow((point[0] - robx), 2) + pow((point[1] - roby), 2))
-        i = i+1
+        i = i + 1
     val = min(dists)
-    return val > safety_tolerance, val
+    closest_index = dists.index(val)
+    return val > safety_tolerance, val, closest_index
 
 
 def robotAtGoal(robx, roby, goalx, goaly):
@@ -123,7 +110,7 @@ def getLookAheadPoint(waypoints, robx, roby, lookAheadDistance, lastIndex, lastF
 
 
 def injectPoints(waypoints):
-    spacing = 0.5
+    spacing = 0.1
     new_points = []
     for j in range(0, len(waypoints) - 1):
         start_point = waypoints[j]
@@ -157,36 +144,58 @@ def smoothPath(path):  # path is [(x1, y1), ..., (xend, yend)]
     return newPath
 
 
+def vel_pid(vg, vc, dt):
+    v_goal = vg  # output of neural net in m/s
+    v_curr = vc  # current velocity in m/s
+    prev_err = 0.0
+    windup_guard = 10  # needs to be changed??
+    kp = 1
+    ki = 0.1
+    kd = 0.1
+    error = v_goal - v_curr
+    delta_error = error - prev_err
+    p = kp*error
+    i = i + error * dt
+    if i < -windup_guard:
+        i = windup_guard
+    elif i > windup_guard:
+        i = windup_guard
+    d = 0.0  # use acceleration calculated above??
+    if delta_time > 0:
+        d = delta_error/dt
+    prev_err = error
+    vel = p + ki*i + kd*d
+    return vel
+
+
 def stop_robot(vel_msg, velocity_publisher):
     vel_msg.linear.x = 0
     vel_msg.angular.z = 0
     velocity_publisher.publish(vel_msg)
 
 
-def main(velocity, angle_deg, safety_threshold):
+def main(angle_deg):
     velocity_publisher = rospy.Publisher('/jackal_velocity_controller/cmd_vel', Twist, queue_size=10)
     rospy.Subscriber('/gazebo/model_states', ModelStates, statesCallback)
     rate = rospy.Rate(10)
     vel_msg = Twist()
     angle = radians(angle_deg)  # in radians
     branching_point = (10, 0)
-    end_point = (branching_point[0] + 10*cos(angle), 10*sin(angle))
+    end_point = (branching_point[0] + 10 * cos(angle), 10 * sin(angle))
     print(end_point)
     waypoints = [branching_point, end_point]
     waypoints2 = [(0, 0), branching_point, end_point]
-    path = injectPoints(waypoints2)
-    lookAheadDistance = 2
+    lookAheadDistance = 10
+    horizon = 10
     lastIndex = 0
     lastFractionalIndex = 0
     lookAheadPoint = waypoints[0]
     atGoalHack = 0  # needs to be fixed
-
-    begin = datetime.datetime.now()
-    time_to_stop = 4  # in minutes
+    start_angle = yaw
 
     while not rospy.is_shutdown():
         path = injectPoints(waypoints2)
-        unsafe, robot_deviation = robotUnsafe(x, y, path, safety_threshold)
+        unsafe, robot_deviation, closest_index = robotUnsafe(x, y, path)
         if unsafe:
             print("unsafe")
             stop_robot(vel_msg, velocity_publisher)
@@ -197,22 +206,20 @@ def main(velocity, angle_deg, safety_threshold):
             stop_robot(vel_msg, velocity_publisher)
             break
 
-        now = datetime.datetime.now()
-        # will stop program if robot hasn't found goal or become unsafe after time_to_stop minutes
-        if begin + datetime.timedelta(minutes=time_to_stop) < now:
-            print("timed out")
-            stop_robot(vel_msg, velocity_publisher)
-            break
-
         lookAheadPoint, lastIndex, lastFractionalIndex = getLookAheadPoint(waypoints, x, y, lookAheadDistance,
                                                                            lastIndex, lastFractionalIndex,
                                                                            lookAheadPoint)
-
         goal_pose_x = lookAheadPoint[0]
         goal_pose_y = lookAheadPoint[1]
 
+        horizon_point1 = path[closest_index + horizon]
+        horizon_point2 = path[closest_index + horizon + 1]
+        # Estimate angle from starting pose
+        angl = atan2(horizon_point2[1] - horizon_point1[1], horizon_point2[0] - horizon_point1[0]) - start_angle
+        fut_velocity = model.predict([[mu, angl]])[0][0]
+
         # linear velocity in the x-axis:
-        vel_msg.linear.x = velocity
+        vel_msg.linear.x = fut_velocity
         vel_msg.linear.y = 0
         vel_msg.linear.z = 0
 
@@ -226,13 +233,13 @@ def main(velocity, angle_deg, safety_threshold):
         rate.sleep()
         atGoalHack += 1
 
-    print("Killing now...")
+    print("kill me")
     sys.stdout.flush()
-    
-    os.popen('killall -9 rosmaster')
-    os.popen('killall -9 roscore')
-    os.popen('killall -9 gzclient')
-    os.popen('killall -9 gzserver')
+    # time.sleep(20)
+    raw_input("")  # kill 0 sent from bash script not working, so you have to ctrl-c manually
+
+    for process in psutil.process_iter():
+        print(process.cmdline())
 
 
 if __name__ == "__main__":
@@ -240,11 +247,6 @@ if __name__ == "__main__":
 
     run = rospy.get_param('~run')
     angle = rospy.get_param('~angle')
-    safety_threshold = rospy.get_param('~safety_threshold')
     mu = calculate_mu(run)
-    velocity = calculate_velocity(run)
 
-    print("velocity: ", velocity, "angle: ", angle)
-    main(velocity, angle, safety_threshold)
-
-
+    main(angle)
