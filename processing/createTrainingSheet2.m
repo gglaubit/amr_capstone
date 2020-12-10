@@ -8,7 +8,7 @@ close all
 bags = dir('*.bag'); % this calls/lists all bag files in directory
 training_data = zeros(length(bags), 6);
 empty_runs = [];
-thresholds = [1 1.5 2 2.5 3];
+thresholds = [1 1.5 2 2.5 3 3.5 4];
 filename = "C:\Users\student\Desktop\Katie\Capstone\horizon tests bag files\horizon tests bag files\paths.csv";
 paths = csvread(filename);
 
