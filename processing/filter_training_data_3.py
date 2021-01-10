@@ -3,7 +3,7 @@ import numpy as np
 import csv
 
 VELOCITY = [0.2, 0.4, 0.6, 0.8, 1, 1.2, 1.4, 1.6, 1.8, 2]
-THRESHOLD = [1, 1.5, 2, 2.5, 3, 3.5, 4]
+THRESHOLD = [1]
 MU = [0.009, 0.09, 0.05, 0.5, 1]
 ANGLE = list(range(0, 180, 15))
 
@@ -78,7 +78,7 @@ for index in all_vels:
         else:
             min_vels[index] = all_vels[index][p2][1]
 
-with open('testing_3.csv', 'w') as csv_file:
+with open('testing.csv', 'w') as csv_file:
     writer = csv.writer(csv_file)
     writer.writerow(('mu', 'angle', 'threshold', 'speed'))
     for index in all_vels.keys():  # inefficient, we could use 1 dict
