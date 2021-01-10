@@ -3,7 +3,7 @@ import numpy as np
 import csv
 
 VELOCITY = [0.2, 0.4, 0.6, 0.8, 1, 1.2, 1.4, 1.6, 1.8, 2]
-THRESHOLD = [1]
+THRESHOLD = [1, 1.5, 2, 2.5, 3, 3.5, 4]
 MU = [0.009, 0.09, 0.05, 0.5, 1]
 ANGLE = list(range(0, 180, 15))
 
@@ -28,9 +28,9 @@ with open('training_data.csv') as csv_file:
             removed.append(row)
 
 for row in removed:
-    mu, angle, thresh = row[1], row[3], row[4]
+    mu, angle, thresh = row[1], row[3], row[4] # check
     vel = float(row[2])
-    success = int(row[5])
+    success = int(row[7])
     index = mu + "_" + angle + "_" + thresh
 
     all_vels[index].append([success, vel])
@@ -71,14 +71,14 @@ for index in all_vels:
     if all_failures == True:
         max_vels[index] = 0
         min_vels[index] = 0
-    else:  # succeeds at 0.2, so we set min vel to 0
+    else:
         max_vels[index] = all_vels[index][p1][1]
         if abs(p2) > len(all_vels[index]):  # if it succeeds all the way down
-            min_vels[index] = all_vels[index][0][1]  # min velocity
+            min_vels[index] = all_vels[index][0][1]  # min velocity tested (0.2 for now)
         else:
             min_vels[index] = all_vels[index][p2][1]
 
-with open('testing.csv', 'w') as csv_file:
+with open('testing_3.csv', 'w') as csv_file:
     writer = csv.writer(csv_file)
     writer.writerow(('mu', 'angle', 'threshold', 'speed'))
     for index in all_vels.keys():  # inefficient, we could use 1 dict
