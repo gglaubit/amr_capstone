@@ -1,3 +1,5 @@
 logs/*.txt
 *.bag
 *.ipynb_checkpoints*
+*.zip
+processing/plots
