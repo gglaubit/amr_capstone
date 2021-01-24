@@ -35,40 +35,46 @@ def statesCallback(data):
     yaw = euler[2]
 
 
-def calculate_mu(run):
-    if run <= 600:
-        return 0.009
-    elif 600 < run <= 1200:
-        return 0.09
-    elif 1200 < run <= 1800:
-        return 1
-    elif 1800 < run <= 2400:
-        return 0.05
-    elif 2400 < run:
-        return 0.5
-    return None
-
-
 def calculate_velocity(run):
-    if run % 10 == 1:
+    if run % 20 == 1:
+        return 0.1
+    elif run % 20 == 2:
         return 0.2
-    elif run % 10 == 2:
+    elif run % 20 == 3:
+        return 0.3
+    elif run % 20 == 4:
         return 0.4
-    elif run % 10 == 3:
+    elif run % 20 == 5:
+        return 0.5
+    elif run % 20 == 6:
         return 0.6
-    elif run % 10 == 4:
+    elif run % 20 == 7:
+        return 0.7
+    elif run % 20 == 8:
         return 0.8
-    elif run % 10 == 5:
+    elif run % 20 == 9:
+        return 0.9
+    elif run % 20 == 10:
         return 1.0
-    elif run % 10 == 6:
+    elif run % 20 == 11:
+        return 1.1
+    elif run % 20 == 12:
         return 1.2
-    elif run % 10 == 7:
+    elif run % 20 == 13:
+        return 1.3
+    elif run % 20 == 14:
         return 1.4
-    elif run % 10 == 8:
+    elif run % 20 == 15:
+        return 1.5
+    elif run % 20 == 16:
         return 1.6
-    elif run % 10 == 9:
+    elif run % 20 == 17:
+        return 1.7
+    elif run % 20 == 18:
         return 1.8
-    elif run % 10 == 0:
+    elif run % 20 == 19:
+        return 1.9
+    elif run % 20 == 0:
         return 2.0
     return None
 
@@ -229,10 +235,10 @@ def main(velocity, angle_deg, safety_threshold):
     print("Done.")
     sys.stdout.flush()
     
-    #os.popen('killall -9 rosmaster')
-    #os.popen('killall -9 roscore')
-    #os.popen('killall -9 gzclient')
-    #os.popen('killall -9 gzserver')
+    os.popen('killall -9 rosmaster')
+    os.popen('killall -9 roscore')
+    os.popen('killall -9 gzclient')
+    os.popen('killall -9 gzserver')
 
 
 if __name__ == "__main__":
@@ -241,7 +247,7 @@ if __name__ == "__main__":
     run = rospy.get_param('~run')
     angle = rospy.get_param('~angle')
     safety_threshold = rospy.get_param('~safety_threshold')
-    mu = calculate_mu(run)
+    mu = 1
     velocity = calculate_velocity(run)
 
     print("velocity: ", velocity, "angle: ", angle)

@@ -38,7 +38,7 @@ environments = {0.009: "ice_009",
                 0.07: "ice_07",
                 0.7: "ice_7"}
 
-model = keras.models.load_model('/home/bezzo/catkin_ws/src/capstone_nodes/NNet_all(3).h5', custom_objects={
+model = keras.models.load_model('/home/bezzo/catkin_ws/src/capstone_nodes/NNet_all_jan10.h5', custom_objects={
     'Normalization': keras.layers.experimental.preprocessing.Normalization()}, compile=False)
 
 
@@ -144,7 +144,7 @@ def getLookAheadPoint(path, robx, roby, lookAheadDistance, space, lastLookAhead)
             d[j] = 10
         j = j + 1
     val2 = min(d)
-    print(val2)
+    #print(val2)
     lookAheadIndex = d.index(val2)
     if lookAheadIndex <= lastLookAhead:
         lookAheadIndex = lastLookAhead + 1
@@ -235,6 +235,10 @@ def main(mu, safety_tol):
     #waypoints2 = [(0, 0), branching_point, end_point]
     waypoints = [(10,0), (20, 10), (30, 10), (10, 20), (0,0)]
     waypoints2 = [(0,0), (10,0), (20, 10), (30, 10), (10, 20), (0,0)]
+
+    #waypoints = [(5, 0), (15, 5), (25, 5), (5, 15), (0, 0)]
+    #waypoints2 = [(0, 0), (5, 0), (15, 5), (25, 5), (5, 15), (0, 0)]
+
     space = 0.1
     path = injectPoints(waypoints2, space)
     smooth_path = smoothPath(path)
@@ -296,11 +300,12 @@ def main(mu, safety_tol):
                 horizon_point2 = path[-1]
             a = atan2(horizon_point2[1] - horizon_point1[1], horizon_point2[0] - horizon_point1[0]) - yaw
             ang = abs(degrees(a))
-            fut_velocity = model.predict([[mu, ang, safety_tol]])[0][0]
+            fut_velocity = model.predict([[mu, ang, safety_tol]])[0][1]
             pred_vels[horizon] = fut_velocity
             horizon = horizon + 1
         # Current Measure of Safety is slowest but how will that be with more complex systems
         vel = min(pred_vels)
+        print(vel)
         
         ang_vel = (atan2(goal_pose_y - y, goal_pose_x - x) - yaw)
         #theta = atan2(goal_pose_y - y, goal_pose_x - x)
@@ -314,7 +319,7 @@ def main(mu, safety_tol):
            
 
         # linear velocity in the x-axis:
-        vel_msg.linear.x = 1 #vel
+        vel_msg.linear.x = vel
         vel_msg.linear.y = 0
         vel_msg.linear.z = 0
 
@@ -353,7 +358,7 @@ def main(mu, safety_tol):
 
 if __name__ == "__main__":
     rospy.init_node('capstone_nodes', anonymous=True)
-    mu = 1
+    mu = 1.0
     safety_tol = 5
     env = environments[mu]
     main(mu, safety_tol)

@@ -5,6 +5,7 @@ import time # for sleeping - time.sleep is commented out below right now
 import os
 import rospy
 import argparse
+import datetime
 import subprocess
 from subprocess import Popen
 import psutil
@@ -21,7 +22,7 @@ import csv
 x = 0.0
 y = 0.0
 v = 0.0
-yaw = 0.0
+yaww = 0.0
 yaw2 = 0.0
 quat = 0.0
 quat2 = 0.0
@@ -40,12 +41,12 @@ environments = {0.009: "ice_009",
                 0.005: "ice_005",
                 0.0009: "ice_0009"}
 
-model = keras.models.load_model('/home/bezzo/catkin_ws/src/capstone_nodes/NNet_all_jan10.h5', custom_objects={
+model = keras.models.load_model('/home/bezzo/catkin_ws/src/capstone_nodes/1_speed_network(2).h5', custom_objects={
     'Normalization': keras.layers.experimental.preprocessing.Normalization()}, compile=False)
 
 
 def statesCallback(data):
-    global x, y, v, yaw, quat
+    global x, y, v, yaww, quat
     # find index of slash
     name = data.name
     index = name.index("jackal")
@@ -60,7 +61,7 @@ def statesCallback(data):
         data.pose[index].orientation.w
     )
     euler = euler_from_quaternion(quaternion)
-    yaw = euler[2]
+    yaww = euler[2]
     quat = quaternion[3]
 
 
@@ -77,36 +78,42 @@ def odomCallback(data):
     quat2 = quaternion[3]
 
 
-def terminate_process_and_children(p):
-    import psutil
-    process = psutil.Process(p.pid)
-    for sub_process in process.children(recursive=True):
-        sub_process.send_signal(signal.SIGINT)
-    # p.wait()  # we wait for children to terminate
-    p.terminate()
+def calculate_mu(run):
+    if run <= 120:
+        return 0.009
+    elif 121 < run <= 240:
+        return 0.09
+    elif 241 < run <= 360:
+        return 1
+    elif 361 < run <= 480:
+        return 0.05
+    elif 481 < run:
+        return 0.5
+    return None
 
 
-def signal_process_and_children(pid, signal_to_send, wait=False):
-    process = psutil.Process(pid)
-    for children in process.children(recursive=True):
-        if signal_to_send == 'suspend':
-            children.suspend()
-        elif signal_to_send == 'resume':
-            children.resume()
-        else:
-            children.send_signal(signal_to_send)
-    if wait:
-        process.wait()
-
-
-def terminate_ros_node():
-    list_cmd = subprocess.Popen("rosnode list", shell=True, stdout=subprocess.PIPE)
-    list_output = list_cmd.stdout.read()
-    retcode = list_cmd.wait()
-    assert retcode == 0, "List command returned %d" % retcode
-    for str in list_output.split("\n"):
-        # if (str.startswith(s)):
-        os.system("rosnode kill " + str)
+def calculate_velocity(run):
+    if run % 10 == 1:
+        return 0.2
+    elif run % 10 == 2:
+        return 0.4
+    elif run % 10 == 3:
+        return 0.6
+    elif run % 10 == 4:
+        return 0.8
+    elif run % 10 == 5:
+        return 1.0
+    elif run % 10 == 6:
+        return 1.2
+    elif run % 10 == 7:
+        return 1.4
+    elif run % 10 == 8:
+        return 1.6
+    elif run % 10 == 9:
+        return 1.8
+    elif run % 10 == 0:
+        return 2.0
+    return None
 
 
 def robotUnsafe(robx, roby, path, tol):
@@ -118,26 +125,38 @@ def robotUnsafe(robx, roby, path, tol):
         i = i + 1
     val = min(dists)
     closest_index = dists.index(val)
-    return val > safety_tolerance, val, closest_index
+    return val > safety_tolerance, val
 
 
 def robotAtGoal(robx, roby, goalx, goaly, tol):
     distance_tolerance = tol
     val = sqrt(pow((goalx - robx), 2) + pow((goaly - roby), 2))
     return val <= distance_tolerance
+    
+
+def getClosestIndex(robx, roby, path, tol):
+    safety_tolerance = tol
+    dists = [0] * len(path)
+    i = 0
+    for point in path:
+        dists[i] = sqrt(pow((point[0] - robx), 2) + pow((point[1] - roby), 2))
+        i = i + 1
+    val = min(dists)
+    closest_index = dists.index(val)
+    return closest_index
 
 
 def getLookAheadPoint(path, robx, roby, lastLookAhead):
     dx = [robx - pathx[0] for pathx in path]
     dy = [roby - pathy[1] for pathy in path]
     d = np.hypot(dx, dy)
-    target_idx = np.argmin(d) + 20 #8
-    if target_idx <= lastLookAhead:
-        target_idx = lastLookAhead + 1
-    if target_idx > (len(path) -1):
-        target_idx = (len(path) -1)
+    target_idx = np.argmin(d) + 30
+    #if target_idx <= lastLookAhead:
+    #   target_idx = lastLookAhead + 1
+    if target_idx > (len(path) - 1):
+        target_idx = (len(path) - 1)
     return target_idx
-    
+
 
 def getLookAheadPoint2(path, robx, roby, space, lastLookAhead):
     dists = [0] * len(path)
@@ -203,14 +222,14 @@ def smoothPath(path):  # path is [(x1, y1), ..., (xend, yend)]
     return newPath
 
 
-def main(mu, safety_tol):
+def main(mu, safety_tol, velocity, angle_deg):
     velocity_publisher = rospy.Publisher('/jackal_velocity_controller/cmd_vel', Twist, queue_size=10)
     rospy.Subscriber('/gazebo/model_states', ModelStates, statesCallback)
     rospy.Subscriber('/odometry/filtered', Odometry, odomCallback)
-    info = "{lin_vel}, {ang_vel}, {angle}, {deviation}\n"
+    #info = "{lin_vel}, {ang_vel}, {angle}, {deviation}\n"
     rate = rospy.Rate(10)
     vel_msg = Twist()
-    angle = radians(90)  # in radians
+    angle = radians(angle_deg)  # in radians
     branching_point = (15, 0)
     end_point = (branching_point[0] + 15 * cos(angle), 15 * sin(angle))
     waypoints = [branching_point, end_point]
@@ -219,12 +238,13 @@ def main(mu, safety_tol):
     #waypoints2 = [(0,0), (20,0), (20, 20), (0, 20), (0,0)]
     #waypoints = [(10,0), (20, 10), (30, 10), (10, 20), (0,0)]
     #waypoints2 = [(0,0), (10,0), (20, 10), (30, 10), (10, 20), (0,0)]
-    space = 0.2
+    space = 0.1
     path = injectPoints(waypoints2, space)
+    path_predict = injectPoints(waypoints2, 1)
     smooth_path = smoothPath(path)
     atGoalHack = 0
     pred_vels = [0] * 4
-    filename = "run_data_simple.csv"
+    filename = "run_data_dynamic.csv"
     lastLookAhead = 0
     #lookAheadPoint, lookAheadIndex = getLookAheadPoint2(path, x, y, space, lastLookAhead)
     #lastLookAhead = lookAheadIndex
@@ -233,16 +253,21 @@ def main(mu, safety_tol):
     goal_pose_x = lookAheadPoint[0]
     goal_pose_y = lookAheadPoint[1]
     lastLookAhead = lookAheadIndex
-    csvinput = []
-    with open(filename, 'a') as csvfile:
-       csvwriter = csv.writer(csvfile, delimiter=',')
-       csvwriter.writerow(['new', 'new', 'new', 'new', 'new', 'new', 'new', 'new', 'new', 'new', 'new'])
+    last_x = 0
+    last_y = 0
+    #csvinput = []
+    #with open(filename, 'a') as csvfile:
+    #   csvwriter = csv.writer(csvfile, delimiter=',')
+    #   csvwriter.writerow(['new', 'new', 'new', 'new', 'new', 'new', 'new', 'new', 'new', 'new',   'new', 'new'])
+
+    begin = datetime.datetime.now()
+    time_to_stop = 4  # in minutes
 
     while not rospy.is_shutdown():
     
         path = injectPoints(waypoints2, space)
-        
-        unsafe, robot_deviation, closest_index = robotUnsafe(x, y, smooth_path, safety_tol)
+
+        unsafe, robot_deviation = robotUnsafe(x, y, smooth_path, safety_tol)
         if unsafe:
             print("unsafe")
             vel_msg.linear.x = 0
@@ -256,36 +281,48 @@ def main(mu, safety_tol):
             vel_msg.angular.z = 0
             velocity_publisher.publish(vel_msg)
             break
+
+
+        now = datetime.datetime.now()
+        # will stop program if robot hasn't found goal or become unsafe after time_to_stop minutes
+        if begin + datetime.timedelta(minutes=time_to_stop) < now:
+            print("timed out")
+            stop_robot(vel_msg, velocity_publisher)
+            break
             
         # if robotAtGoal(x, y, goal_pose_x, goal_pose_y, 1):
         #lookAheadPoint, lookAheadIndex = getLookAheadPoint(path, x, y, space, lastLookAhead)
-        
-        target_index = getLookAheadPoint(path, x, y, lastLookAhead)
-        lookAheadPoint = path[target_index]
-        lastLookAhead = target_index 
+            
+        lookAheadIndex = getLookAheadPoint(path, x, y, lastLookAhead)
+        lookAheadPoint = path[lookAheadIndex]
+        lastLookAhead = lookAheadIndex
         goal_pose_x = lookAheadPoint[0]
         goal_pose_y = lookAheadPoint[1]
-
+        
+        closest_index = getClosestIndex(x, y, path_predict, safety_tol)
+        
         horizon = 0
         while horizon < 4:
             try:
-                horizon_point1 = path[closest_index + horizon]
-                horizon_point2 = path[closest_index + horizon + 1]
+                horizon_point1 = path_predict[closest_index + horizon]
+                horizon_point2 = path_predict[closest_index + horizon + 1]
             except IndexError as e:
-                horizon_point1 = path[-2]
-                horizon_point2 = path[-1]
-            a = abs(atan2(horizon_point2[1] - horizon_point1[1], horizon_point2[0] - horizon_point1[0])) - abs(yaw)
+                horizon_point1 = path_predict[-2]
+                horizon_point2 = path_predict[-1]
+            # a = abs(atan2(horizon_point2[1] - horizon_point1[1], horizon_point2[0] - horizon_point1[0])) - abs(yaw)
+            path_angle = atan2(horizon_point2[1] - horizon_point1[1], horizon_point2[0] - horizon_point1[0])
+            yaw = atan2(y - last_y, x - last_x)
+            a = path_angle - yaw
             ang = abs(degrees(a))
-            fut_velocity = model.predict([[mu, ang, safety_tol]])[0][1]
+            fut_velocity = model.predict([[mu, ang, safety_tol]])[0][0]
             pred_vels[horizon] = fut_velocity
             horizon = horizon + 1
             
-        # Current Measure of Safety is slowest but how will that be with more complex systems
+        #Current Measure of Safety is slowest but how will that be with more complex systems
         vel = min(pred_vels)
-        print(vel)
-
+        
         theta_d = atan2(goal_pose_y - y, goal_pose_x - x)
-        theta_diff = theta_d - yaw
+        theta_diff = theta_d - yaww
         ang_vel = atan2(sin(theta_diff), cos(theta_diff))
 
         if ang_vel < -(pi / 2):
@@ -294,7 +331,7 @@ def main(mu, safety_tol):
             ang_vel = pi / 2
 
         # linear velocity in the x-axis:
-        vel_msg.linear.x = vel
+        vel_msg.linear.x = velocity
         vel_msg.linear.y = 0
         vel_msg.linear.z = 0
 
@@ -304,21 +341,23 @@ def main(mu, safety_tol):
         vel_msg.angular.z = 4 * ang_vel
 
 
-        csvinput.append([x, y, yaw, lookAheadIndex, goal_pose_x, goal_pose_y, vel, ang, ang_vel, abs(yaw),
-                         atan2(goal_pose_y - y, goal_pose_x - x)])
+        #csvinput.append([x, y, yaw, lookAheadIndex, goal_pose_x, goal_pose_y, vel, ang, ang_vel, yaww, path_angle, a])
         #with open(filename, 'a') as csvfile:
         #    csvwriter = csv.writer(csvfile, delimiter=',')
-        #    csvwriter.writerow([x, y, yaw, lookAheadIndex, goal_pose_x, goal_pose_y, vel, ang, ang_vel, abs(yaw),
-        #                        atan2(goal_pose_y - y, goal_pose_x - x)])
+        #    csvwriter.writerow([x, y, yaw, lookAheadIndex, goal_pose_x, goal_pose_y, vel, ang, ang_vel, yaww, path_angle, a])
 
         # publishing our vel_msg
         velocity_publisher.publish(vel_msg)
         rate.sleep()
         atGoalHack += 1
+        
+        last_x = x
+        last_y = y
 
-    with open('after.csv', 'w') as csvfile:
-        csvwriter = csv.writer(csvfile, delimiter=',')
-        csvwriter.writerows(csvinput)
+    #with open('after.csv', 'w') as csvfile:
+    #    csvwriter = csv.writer(csvfile, delimiter=',')
+    #    csvwriter.writerows(csvinput)
+
     # log_file.close()
     print("kill me")
     sys.stdout.flush()
@@ -331,7 +370,11 @@ def main(mu, safety_tol):
 
 if __name__ == "__main__":
     rospy.init_node('capstone_nodes', anonymous=True)
-    mu = 0.09
-    safety_tol = 4
-    env = environments[mu]
-    main(mu, safety_tol)
+
+    run = rospy.get_param('~run')
+    angle = rospy.get_param('~angle')
+    safety_threshold = 4
+    mu = calculate_mu(run)
+    velocity = calculate_velocity(run)
+  
+    main(mu, safety_threshold, velocity, angle)

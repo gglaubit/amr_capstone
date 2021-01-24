@@ -56,8 +56,8 @@ def main():
     i = 0
     while i < 180:
         angle = radians(i)  # in radians
-        branching_point = (10, 0)
-        end_point = (branching_point[0] + 10*cos(angle), 10*sin(angle))
+        branching_point = (15, 0)
+        end_point = (branching_point[0] + 15*cos(angle), 15*sin(angle))
         waypoints = [(0,0), branching_point, end_point]
         path = injectPoints(waypoints)
         path = smoothPath(path)

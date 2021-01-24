@@ -192,11 +192,12 @@ def main(mu, safety_tol):
     path = injectPoints(waypoints2, space)
     smooth_path = smoothPath(path)
     atGoalHack = 0
-    pred_vels = [0] * 10
-    angles = [0] * 20
+    pred_vels = [0] * 4
+    angles = [0] * 4
     filename = "run_data.csv"
     lastLookAhead = 0
     csvinput = []
+    test = 0
 
     while not rospy.is_shutdown():
         path = injectPoints(waypoints2, 0.1)
@@ -221,8 +222,9 @@ def main(mu, safety_tol):
         goal_pose_x = lookAheadPoint[0]
         goal_pose_y = lookAheadPoint[1]
 
+        #print('1')
         horizon = 0
-        while horizon < 10:
+        while horizon < 4:
             try:
                 horizon_point1 = path[closest_index + horizon]
                 horizon_point2 = path[closest_index + horizon + 1]
@@ -232,12 +234,14 @@ def main(mu, safety_tol):
             a = abs(atan2(horizon_point2[1] - horizon_point1[1], horizon_point2[0] - horizon_point1[0])) - abs(yaw)
             ang = abs(degrees(a))
             angles[horizon] = ang
-            fut_velocity = model.predict([[mu, ang, safety_tol]])[0][0]
+            fut_velocity = 2 #model.predict([[mu, ang, safety_tol]])[0][0]
             pred_vels[horizon] = fut_velocity
             horizon = horizon + 1
         # Current Measure of Safety is slowest but how will that be with more complex systems
         vel = min(pred_vels)
         anglee = angles[pred_vels.index(vel)]
+
+        #print('2')
 
         theta_d = atan2(goal_pose_y - y, goal_pose_x - x)
         theta_diff = theta_d - yaw
@@ -249,7 +253,7 @@ def main(mu, safety_tol):
             ang_vel = pi / 2
 
         # linear velocity in the x-axis:
-        vel_msg.linear.x = 1 #vel
+        vel_msg.linear.x = vel
         vel_msg.linear.y = 0
         vel_msg.linear.z = 0
 
@@ -258,7 +262,8 @@ def main(mu, safety_tol):
         vel_msg.angular.y = 0
         vel_msg.angular.z = 1 * ang_vel
 
-        print(vel, anglee)
+        print(test)
+        test = test + 1
 
         csvinput.append([x, y, yaw, target_index, goal_pose_x, goal_pose_y, vel, anglee, ang_vel, abs(yaw),
                          atan2(goal_pose_y - y, goal_pose_x - x)])
@@ -294,6 +299,6 @@ def main(mu, safety_tol):
 if __name__ == "__main__":
     rospy.init_node('capstone_nodes', anonymous=True)
     mu = 1 #rospy.get_param('~mu')
-    safety_tol = 2.5
+    safety_tol = 4
     env = environments[mu]
     main(mu, safety_tol)

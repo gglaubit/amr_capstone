@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import sys  # for redirecting output in bash, could be removed
-import time # for sleeping - time.sleep is commented out below right now
+# import time # for sleeping - time.sleep is commented out below right now
 import os
 import rospy
 import argparse
@@ -36,9 +36,7 @@ environments = {0.009: "ice_009",
                 0.02: "ice_02",
                 0.2: "ice_2",
                 0.07: "ice_07",
-                0.7: "ice_7",
-                0.005: "ice_005",
-                0.0009: "ice_0009"}
+                0.7: "ice_7"}
 
 model = keras.models.load_model('/home/bezzo/catkin_ws/src/capstone_nodes/NNet_all_jan10.h5', custom_objects={
     'Normalization': keras.layers.experimental.preprocessing.Normalization()}, compile=False)
@@ -131,7 +129,7 @@ def getLookAheadPoint(path, robx, roby, lastLookAhead):
     dx = [robx - pathx[0] for pathx in path]
     dy = [roby - pathy[1] for pathy in path]
     d = np.hypot(dx, dy)
-    target_idx = np.argmin(d) + 20 #8
+    target_idx = np.argmin(d) + 8
     if target_idx <= lastLookAhead:
         target_idx = lastLookAhead + 1
     if target_idx > (len(path) -1):
@@ -139,7 +137,7 @@ def getLookAheadPoint(path, robx, roby, lastLookAhead):
     return target_idx
     
 
-def getLookAheadPoint2(path, robx, roby, space, lastLookAhead):
+def getLookAheadPoint2(path, robx, roby, lookAheadDistance, space, lastLookAhead):
     dists = [0] * len(path)
     i = 0
     for point in path:
@@ -165,7 +163,7 @@ def getLookAheadPoint2(path, robx, roby, space, lastLookAhead):
     if lookAheadIndex > (len(path) - 1):
         lookAheadIndex = len(path) - 1
     lookAheadPoint = path[lookAheadIndex]
-    return lookAheadPoint, lookAheadIndex
+    return lookAheadPoint, closest_index, lookAheadIndex
 
 
 def injectPoints(waypoints, space):
@@ -203,45 +201,48 @@ def smoothPath(path):  # path is [(x1, y1), ..., (xend, yend)]
     return newPath
 
 
-def main(mu, safety_tol):
+def main(safety_tol):
     velocity_publisher = rospy.Publisher('/jackal_velocity_controller/cmd_vel', Twist, queue_size=10)
     rospy.Subscriber('/gazebo/model_states', ModelStates, statesCallback)
     rospy.Subscriber('/odometry/filtered', Odometry, odomCallback)
     info = "{lin_vel}, {ang_vel}, {angle}, {deviation}\n"
     rate = rospy.Rate(10)
     vel_msg = Twist()
-    angle = radians(90)  # in radians
-    branching_point = (15, 0)
-    end_point = (branching_point[0] + 15 * cos(angle), 15 * sin(angle))
-    waypoints = [branching_point, end_point]
-    waypoints2 = [(0, 0), branching_point, end_point]
-    #waypoints = [(20,0), (20, 20), (0, 20), (0,0)]
-    #waypoints2 = [(0,0), (20,0), (20, 20), (0, 20), (0,0)]
-    #waypoints = [(10,0), (20, 10), (30, 10), (10, 20), (0,0)]
-    #waypoints2 = [(0,0), (10,0), (20, 10), (30, 10), (10, 20), (0,0)]
-    space = 0.2
+    angle = radians(110)  # in radians
+    branching_point = (10, 0)
+    end_point = (branching_point[0] + 10 * cos(angle), 10 * sin(angle))
+    
+    waypoints = [(5,-5), (5, 5), (-5, 5)]
+    waypoints2 = [(-5,-5), (5,-5), (5, 5), (-5, 5)]
+
+
+    space = 0.1
     path = injectPoints(waypoints2, space)
     smooth_path = smoothPath(path)
+    lookAheadDistance = 4
+    # lookAheadPoint = path[]
+    lastLookAhead = 0
     atGoalHack = 0
     pred_vels = [0] * 4
-    filename = "run_data_simple.csv"
-    lastLookAhead = 0
-    #lookAheadPoint, lookAheadIndex = getLookAheadPoint2(path, x, y, space, lastLookAhead)
+    filename = "square_data.csv"
+    # print(path)
+    # print(smooth_path)
+    #lookAheadPoint, closest_index, lookAheadIndex = getLookAheadPoint(path, x, y, lookAheadDistance, space,
+                                                                      #lastLookAhead)
     #lastLookAhead = lookAheadIndex
-    lookAheadIndex = getLookAheadPoint(path, x, y, lastLookAhead)
-    lookAheadPoint = path[lookAheadIndex]
+    target_index = getLookAheadPoint(path, x, y, lastLookAhead)
+    lookAheadPoint = path[target_index]
     goal_pose_x = lookAheadPoint[0]
     goal_pose_y = lookAheadPoint[1]
-    lastLookAhead = lookAheadIndex
+    lastLookAhead = target_index
+    lookAheadDistance = 4
+    lastIndex = 0
+    lastFractionalIndex = 0
+    lookAheadIndex = 0
     csvinput = []
-    with open(filename, 'a') as csvfile:
-       csvwriter = csv.writer(csvfile, delimiter=',')
-       csvwriter.writerow(['new', 'new', 'new', 'new', 'new', 'new', 'new', 'new', 'new', 'new', 'new'])
 
     while not rospy.is_shutdown():
-    
-        path = injectPoints(waypoints2, space)
-        
+        path = injectPoints(waypoints2, 0.1)
         unsafe, robot_deviation, closest_index = robotUnsafe(x, y, smooth_path, safety_tol)
         if unsafe:
             print("unsafe")
@@ -256,15 +257,30 @@ def main(mu, safety_tol):
             vel_msg.angular.z = 0
             velocity_publisher.publish(vel_msg)
             break
-            
+
         # if robotAtGoal(x, y, goal_pose_x, goal_pose_y, 1):
-        #lookAheadPoint, lookAheadIndex = getLookAheadPoint(path, x, y, space, lastLookAhead)
-        
+        #lookAheadPoint, closest_index, lookAheadIndex = getLookAheadPoint(path, x, y, lookAheadDistance, space,
+                                                                          #lastLookAhead)
         target_index = getLookAheadPoint(path, x, y, lastLookAhead)
         lookAheadPoint = path[target_index]
-        lastLookAhead = target_index 
+        lastLookAhead = target_index#lookAheadIndex
         goal_pose_x = lookAheadPoint[0]
         goal_pose_y = lookAheadPoint[1]
+
+        # lookAheadPoint, lastIndex, lastFractionalIndex = getLookAheadPoint2(path, x, y, lookAheadDistance,
+        # lastIndex, lastFractionalIndex,
+        # lookAheadPoint)
+        # goal_pose_x = lookAheadPoint[0]
+        # goal_pose_y = lookAheadPoint[1]
+
+        if x < 0 and y < 0:
+            mu = 0.009
+        elif x < 0 and y > 0:
+            mu = 0.09
+        elif x > 0 and y < 0:
+            mu = 0.5
+        elif x > 0 and y > 0:
+            mu = 0.05
 
         horizon = 0
         while horizon < 4:
@@ -275,14 +291,16 @@ def main(mu, safety_tol):
                 horizon_point1 = path[-2]
                 horizon_point2 = path[-1]
             a = abs(atan2(horizon_point2[1] - horizon_point1[1], horizon_point2[0] - horizon_point1[0])) - abs(yaw)
+            # a = atan2(horizon_point1[1] - x, horizon_point1[0] - y) - yaw
             ang = abs(degrees(a))
             fut_velocity = model.predict([[mu, ang, safety_tol]])[0][1]
             pred_vels[horizon] = fut_velocity
             horizon = horizon + 1
-            
         # Current Measure of Safety is slowest but how will that be with more complex systems
         vel = min(pred_vels)
         print(vel)
+
+        #ang_vel = (atan2(goal_pose_y - y, goal_pose_x - x) - yaw)
 
         theta_d = atan2(goal_pose_y - y, goal_pose_x - x)
         theta_diff = theta_d - yaw
@@ -303,13 +321,16 @@ def main(mu, safety_tol):
         vel_msg.angular.y = 0
         vel_msg.angular.z = 4 * ang_vel
 
+        # print(x, y, yaw, lookAheadIndex, goal_pose_x, goal_pose_y, vel, a, ang_vel)
+        # print(goal_pose_x, goal_pose_y)
+        print(vel)
 
-        csvinput.append([x, y, yaw, lookAheadIndex, goal_pose_x, goal_pose_y, vel, ang, ang_vel, abs(yaw),
+        csvinput.append([x, y, yaw, lookAheadIndex, goal_pose_x, goal_pose_y, vel, a, ang_vel, abs(yaw),
                          atan2(goal_pose_y - y, goal_pose_x - x)])
-        #with open(filename, 'a') as csvfile:
-        #    csvwriter = csv.writer(csvfile, delimiter=',')
-        #    csvwriter.writerow([x, y, yaw, lookAheadIndex, goal_pose_x, goal_pose_y, vel, ang, ang_vel, abs(yaw),
-        #                        atan2(goal_pose_y - y, goal_pose_x - x)])
+        with open(filename, 'a') as csvfile:
+            csvwriter = csv.writer(csvfile, delimiter=',')
+            csvwriter.writerow([x, y, yaw, lookAheadIndex, goal_pose_x, goal_pose_y, vel, a, ang_vel, abs(yaw),
+                                atan2(goal_pose_y - y, goal_pose_x - x)])
 
         # publishing our vel_msg
         velocity_publisher.publish(vel_msg)
@@ -325,13 +346,17 @@ def main(mu, safety_tol):
     # time.sleep(20)
     raw_input("")  # kill 0 sent from bash script not working, so you have to ctrl-c manually
 
+    # terminate_process_and_children(proc)
+    # signal_process_and_children(proc.pid, signal.SIGINT, True)
+    # terminate_ros_node()
+    # proc.send_signal(subprocess.signal.SIGINT)
+    # proc.kill()
+    # proc.terminate()
     for process in psutil.process_iter():
         print(process.cmdline())
 
 
 if __name__ == "__main__":
     rospy.init_node('capstone_nodes', anonymous=True)
-    mu = 0.09
-    safety_tol = 4
-    env = environments[mu]
-    main(mu, safety_tol)
+    safety_tol = 5
+    main(safety_tol)
