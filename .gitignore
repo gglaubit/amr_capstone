@@ -3,3 +3,5 @@ logs/*.txt
 *.ipynb_checkpoints*
 *.zip
 processing/plots
+*.h5
+*.csv
