@@ -187,7 +187,7 @@ def main(velocity, angle_deg, safety_threshold):
     atGoalHack = 0  # needs to be fixed
 
     begin = datetime.datetime.now()
-    time_to_stop = 23  # in minutes
+    time_to_stop = 4  # in minutes
 
     while not rospy.is_shutdown():
         path = injectPoints(waypoints2)

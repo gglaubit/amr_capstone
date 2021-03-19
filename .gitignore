@@ -1,2 +1,4 @@
 logs/*.txt
 *.bag
+*.csv
+*.h5

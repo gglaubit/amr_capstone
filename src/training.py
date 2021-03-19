@@ -162,6 +162,9 @@ def main(velocity, angle_deg, safety_threshold):
     path = injectPoints(waypoints2)
     lastLookAhead = 0
     atGoalHack = 0  # needs to be fixed
+    csvinput = []
+    filename = "training_old.csv"
+
 
     begin = datetime.datetime.now()
     time_to_stop = 4  # in minutes
@@ -216,6 +219,11 @@ def main(velocity, angle_deg, safety_threshold):
         rate.sleep()
         atGoalHack += 1
 
+        csvinput.append([x, y, yaw, target_index, goal_pose_x, goal_pose_y, velocity, angle_deg, ang_vel])
+        with open(filename, 'a') as csvfile:
+            csvwriter = csv.writer(csvfile, delimiter=',')
+            csvwriter.writerow([x, y, yaw, target_index, goal_pose_x, goal_pose_y, velocity, angle_deg, ang_vel])
+
     #print("Killing now...")
     print("Done.")
     sys.stdout.flush()
@@ -232,8 +240,8 @@ if __name__ == "__main__":
     run = 1210 #rospy.get_param('~run')
     angle = 120 #rospy.get_param('~angle')
     safety_threshold = 4
-    mu = calculate_mu(run)
-    velocity = calculate_velocity(run)
+    mu = 0.09 #calculate_mu(run)
+    velocity = 2 #calculate_velocity(run)
     #velocity = 1
     #angle = 90
     #mu = 0.009

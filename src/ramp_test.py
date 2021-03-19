@@ -3,6 +3,7 @@
 import sys
 import os
 import rospy
+import random
 import datetime
 from geometry_msgs.msg import Twist
 import numpy as np
@@ -18,7 +19,10 @@ y = 0.0
 v = 0.0
 yaw = 0.0
 
-model = keras.models.load_model('/home/bezzo/catkin_ws/src/capstone_nodes/Ramp_ValidityData.h5', custom_objects={
+model = keras.models.load_model('/home/bezzo/catkin_ws/src/capstone_nodes/ramp_success_network_MAR1.h5', custom_objects={
+    'Normalization': keras.layers.experimental.preprocessing.Normalization()}, compile=False)
+
+model2 = keras.models.load_model('/home/bezzo/catkin_ws/src/capstone_nodes/1_speed_ramp_network_MAR1.h5', custom_objects={
     'Normalization': keras.layers.experimental.preprocessing.Normalization()}, compile=False)
 
 def statesCallback(data):
@@ -37,45 +41,6 @@ def statesCallback(data):
     )
     euler = euler_from_quaternion(quaternion)
     yaw = euler[2]
-
-
-def calculate_mu(run):
-    if run <= 600:
-        return 0.009
-    elif 600 < run <= 1200:
-        return 0.09
-    elif 1200 < run <= 1800:
-        return 1
-    elif 1800 < run <= 2400:
-        return 0.05
-    elif 2400 < run:
-        return 0.5
-    return None
-
-
-def calculate_velocity(run):
-    if run % 10 == 1:
-        return 0.2
-    elif run % 10 == 2:
-        return 0.4
-    elif run % 10 == 3:
-        return 0.6
-    elif run % 10 == 4:
-        return 0.8
-    elif run % 10 == 5:
-        return 1.0
-    elif run % 10 == 6:
-        return 1.2
-    elif run % 10 == 7:
-        return 1.4
-    elif run % 10 == 8:
-        return 1.6
-    elif run % 10 == 9:
-        return 1.8
-    elif run % 10 == 0:
-        return 2.0
-    return None
-
 
 def robotUnsafe(robx, roby, path, safety_tolerance):
     dists = [0]*len(path)
@@ -166,6 +131,41 @@ def stop_robot(vel_msg, velocity_publisher):
     velocity_publisher.publish(vel_msg)
 
 
+'''
+def find_velocity(length, ang, velocity): 
+	min_vel = 0.2
+	max_vel = 2
+	result = velocity
+	check = model2.predict([[ang,length,velocity]]) [0][0]
+	print(check)
+	if check < 0.5:
+		pred = model.predict([[length,ang]]) [0][0]
+		if pred > 0.6: 
+			velocity = max_vel
+			check = model2.predict([[ang,length,velocity]]) [0][0]	
+			if check >= 0.5 :
+				result = velocity 
+			while check < 0.5:
+				if result < min_vel:
+					return 0
+    				check = model2.predict([[ang,length,velocity]]) [0][0]
+    				result = velocity
+    				velocity = velocity - 0.1
+	return result
+'''
+   	
+
+def find_velocity(mu, length, ang): 
+	result = 0
+	pred = model.predict([[mu,length,ang]]) [0][0]
+	print(pred)
+	#if pred > 0.63: 
+	print(model2.predict([[mu,length,ang]])[0][0])
+	return result
+    			
+    		   		
+    			
+
 def main(velocity, angle_deg, safety_threshold):
     velocity_publisher = rospy.Publisher('/jackal_velocity_controller/cmd_vel', Twist, queue_size=10)
     rospy.Subscriber('/gazebo/model_states', ModelStates, statesCallback)
@@ -241,23 +241,15 @@ def main(velocity, angle_deg, safety_threshold):
 
 if __name__ == "__main__":
     rospy.init_node('capstone_nodes', anonymous=True)
-
+    
     angle = 0
     safety_threshold = 2
-    ang = 0.6
-    length = 0.5
-    mu = 1
-    a_min = 1.3
-    b_min = 5.74
-    c_min = 4.583
-    w_min = 0.9022
-    m_min = -0.5401
-    is_traversable = model.predict([[ang, length, -9.8]])[0]
-    if is_traversable:
-    	velocity = 2
-    	min_velocity = a_min + b_min*sin(m_min*pi*ang*length) + c_min*exp(pow(-(w_min*y),2))  	
-
-    print("velocity: ", min_velocity, "angle: ", ang, "length: ", length)
-    main(0, angle, safety_threshold)
+    ang = float(sys.argv[3])
+    length = float(sys.argv[2])
+    mu = float(sys.argv[1])
+    velocity = find_velocity(mu, length, ang)
+   
+    print("velocity: ", velocity, "angle: ", ang, "length: ", length)
+    main(velocity, angle, safety_threshold)
 
 
