@@ -1,0 +1,6 @@
+<launch>
+
+   <node pkg="capstone_nodes" type="reset_jackal.py" name="reset_jackal" output="screen">		
+    </node>
+
+</launch>

@@ -1,0 +1,820 @@
+<sdf version='1.4'>
+  <world name='default'>
+    <light name='sun' type='directional'>
+      <cast_shadows>1</cast_shadows>
+      <pose>0 0 10 0 -0 0</pose>
+      <diffuse>1.0 1.0 1.0 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <attenuation>
+        <range>1000</range>
+        <constant>0.9</constant>
+        <linear>0.01</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <direction>-0.5 -0.5 -1.0</direction>
+    </light>
+
+    <include>
+	    <uri>model://surface</uri>
+	    <pose>0 0 0  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://ramp_groundplane</uri>
+	    <pose>20 37.5 1.1  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://ramp_groundplane_2</uri>
+	    <pose>18.34 48.55 1.573  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://short_ramp</uri>
+	    <pose>14.205 48.55 1.3  0 -0.6 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://short_ramp</uri>
+	    <pose>22.475 48.55 1.3  0 0.6 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://3m_ramp</uri>
+	    <pose>3.64 37.5 0.52  0 -0.4 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://3m_ramp</uri>
+	    <pose>36.36 37.5 0.52  0 0.4 0</pose>
+    </include>
+
+
+
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>38.1 52.3 0.15  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>37.2 52.3 0.3  0 0.4 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>36.3 52.3 0.68  0 0.4 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>35.4 52.3 1.06  0 0.4 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>34.5 52.3 1.24  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>33.6 52.3 1.24  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>32.7 52.3 1.24  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>31.8 52.3 1.24  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>30.9 52.3 1.24  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>30 52.3 1.24  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>29.1 52.3 1.24  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>28.2 52.3 1.24  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>27.3 52.3 1.24  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>26.4 52.3 1.24  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>25.5 52.3 1.24  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>24.6 52.3 1.24  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>23.7 52.3 1.24  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>23.2 52.3 1.24  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>22.5 52.3 1.44  0 0.6 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>21.7 52.3 1.683  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>20.8 52.3 1.683  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>19.9 52.3 1.683  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>19.0 52.3 1.683  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>18.1 52.3 1.683  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>17.2 52.3 1.683  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>16.3 52.3 1.683  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>15.4 52.3 1.683  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>15 52.3 1.683  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>14.22 52.3 1.44  0 -0.6 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>13.32 52.3 1.24  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>12.4 52.3 1.24  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>11.5 52.3 1.24  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>10.6 52.3 1.24  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>9.7 52.3 1.24  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>8.8 52.3 1.24  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>7.9 52.3 1.24  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>7 52.3 1.24  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>6.1 52.3 1.24  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>5.2 52.3 1.24  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>4.32 52.3 1.06  0 -0.4 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>3.4 52.3 0.67  0 -0.4 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>2.5 52.3 0.29  0 -0.4 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>-2.0 52.3 0.15  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>-12.0 52.3 0.15  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>-17.0 47.3 0.15  0 0 1.5708</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>-17.0 37.3 0.15  0 0 1.5708</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>-17.0 27.3 0.15  0 0 1.5708</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>-17.0 17.3 0.15  0 0 1.5708</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>-17.0 7.3 0.15  0 0 1.5708</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>-17.0 0.3 0.15  0 0 1.5708</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>-12.0 -4.7 0.15  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>-2.0 -4.7 0.15  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>8.0 -4.7 0.15  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>18.0 -4.7 0.15  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>26.52 -1.15 0.15  0 0 0.785398</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>33.0 5.35 0.15  0 0 0.785398</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>39.48 11.85 0.15  0 0 0.785398</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>43.0 10.35 0.15  0 0 1.5708</pose>
+    </include>
+
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>43.0 0.3 0.15  0 0 1.5708</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>48.0 -4.7 0.15  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>58.0 -4.7 0.15  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>63.0 -4.7 0.15  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>68.0 0.3 0.15  0 0 1.5708</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>68.0 10.2 0.15  0 0 1.5708</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>68.0 20.1 0.15  0 0 1.5708</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>68.0 30.0 0.15  0 0 1.5708</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>65.45 39.38 0.15  0 0 2.094399</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>60.5 47.98 0.15  0 0 2.094399</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>53.0 52.3 0.15  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>43.2 52.3 0.15  0 0 0</pose>
+    </include>
+
+
+
+
+
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>50.6 46.3 0.15  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>43.2 46.3 0.15  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>59.55 39.28 0.15  0 0 2.094399</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>58.15 41.78 0.15  0 0 2.094399</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>62.0 6.1 0.15  0 0 1.5708</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>62.0 10.2 0.15  0 0 1.5708</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>62.0 20.1 0.15  0 0 1.5708</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>62.0 30.0 0.15  0 0 1.5708</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>54 1.3 0.15  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>57 1.3 0.15  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>49.0 6.5 0.15  0 0 1.5708</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>49.0 16.35 0.15  0 0 1.5708</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>49.0 22.1 0.15  0 0 1.5708</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>26.52 4.85 0.15  0 0 0.785398</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>33.0 11.35 0.15  0 0 0.785398</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>39.48 17.85 0.15  0 0 0.785398</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>45.5 23.9 0.15  0 0 0.785398</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>-6.0 1.3 0.15  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>-2.0 1.3 0.15  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>8.0 1.3 0.15  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>18.0 1.3 0.15  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>-11.0 41.3 0.15  0 0 1.5708</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>-11.0 37.3 0.15  0 0 1.5708</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>-11.0 27.3 0.15  0 0 1.5708</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>-11.0 17.3 0.15  0 0 1.5708</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>-11.0 7.3 0.15  0 0 1.5708</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>-11.0 6.3 0.15  0 0 1.5708</pose>
+    </include>
+
+
+
+
+
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>38.1 46.3 0.15  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>37.2 46.3 0.3  0 0.4 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>36.3 46.3 0.68  0 0.4 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>35.4 46.3 1.06  0 0.4 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>34.5 46.3 1.24  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>33.6 46.3 1.24  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>32.7 46.3 1.24  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>31.8 46.3 1.24  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>30.9 46.3 1.24  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>30 46.3 1.24  0 0 0</pose>
+    </include>
+
+
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>23.7 46.3 1.24  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>23.2 46.3 1.24  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>22.5 46.3 1.44  0 0.6 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>21.7 46.3 1.683  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>20.8 46.3 1.683  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>19.9 46.3 1.683  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>19.0 46.3 1.683  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>18.1 46.3 1.683  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>17.2 46.3 1.683  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>16.3 46.3 1.683  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>15.4 46.3 1.683  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>15 46.3 1.683  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>14.22 46.3 1.44  0 -0.6 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>13.32 46.3 1.24  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>12.4 46.3 1.24  0 0 0</pose>
+    </include>
+
+
+
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>6.1 46.3 1.24  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>5.2 46.3 1.24  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>4.32 46.3 1.06  0 -0.4 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>3.4 46.3 0.67  0 -0.4 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://wall</uri>
+	    <pose>2.5 46.3 0.29  0 -0.4 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>-2.0 46.3 0.15  0 0 0</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>-6.0 46.3 0.15  0 0 0</pose>
+    </include>
+
+
+
+	
+
+
+
+
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>6.6 41.3 1.24  0 0 1.5708</pose>
+    </include>
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>6.6 31.3 1.24  0 0 1.5708</pose>
+    </include>
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>11.6 26.3 1.24  0 0 0</pose>
+    </include>
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>21.5 26.3 1.24  0 0 0</pose>
+    </include>
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>24.5 26.3 1.24  0 0 0</pose>
+    </include>
+
+
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>29.5 41.3 1.24  0 0 1.5708</pose>
+    </include>
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>29.5 31.3 1.24  0 0 1.5708</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>12.0 41.3 1.24  0 0 1.5708</pose>
+    </include>
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>12.0 37.3 1.24  0 0 1.5708</pose>
+    </include>
+
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>24.2 41.3 1.24  0 0 1.5708</pose>
+    </include>
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>24.2 37.3 1.24  0 0 1.5708</pose>
+    </include>
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>17 32.3 1.24  0 0 0</pose>
+    </include>
+    <include>
+	    <uri>model://10m_wall</uri>
+	    <pose>19.2 32.3 1.24  0 0 0</pose>
+    </include>
+
+
+
+
+    <physics type='ode'>
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1</real_time_factor>
+      <real_time_update_rate>1000</real_time_update_rate>
+      <gravity>0 0 -9.8</gravity>
+    </physics>
+    <scene>
+      <ambient>1 1 1 1</ambient>
+      <background>1 1 1 1</background>
+      <shadows>1</shadows>
+      <sky>
+        <clouds>
+          <speed>12</speed>
+        </clouds>
+      </sky>
+    </scene>
+    <spherical_coordinates>
+      <surface_model>EARTH_WGS84</surface_model>
+      <latitude_deg>0</latitude_deg>
+      <longitude_deg>0</longitude_deg>
+      <elevation>0</elevation>
+      <heading_deg>0</heading_deg>
+    </spherical_coordinates>
+    <state world_name='default'>
+      <sim_time>35 515000000</sim_time>
+      <real_time>35 905493128</real_time>
+      <wall_time>1495129402 253586127</wall_time>
+    </state>
+    <gui fullscreen='0'>
+      <camera name='user_camera'>
+        <pose>15.6556 -10.443 5.76936 0 0.175643 2.35619</pose>
+        <view_controller>orbit</view_controller>
+      </camera>
+    </gui>
+  </world>
+</sdf>

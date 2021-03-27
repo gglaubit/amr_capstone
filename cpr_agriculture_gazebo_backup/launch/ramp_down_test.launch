@@ -1,0 +1,29 @@
+<launch>
+
+    <arg name="platform" default="$(optenv CPR_GAZEBO_PLATFORM jackal)" />
+    <arg name="x" default="0.0"/>
+    <arg name="y" default="0.0"/>
+    <arg name="z" default="0.0"/>
+    <arg name="yaw" default="3.14159" />
+    <arg name="world" default="ramp_down_world.world" />
+
+    <arg name="use_sim_time" default="true" />
+    <arg name="gui" default="true" />
+    <arg name="headless" default="false" />
+    <arg name="world_name" default="$(find cpr_agriculture_gazebo)/worlds/$(arg world)" />
+    <include file="$(find gazebo_ros)/launch/empty_world.launch">
+      <arg name="debug" value="0" />
+      <arg name="gui" value="$(arg gui)" />
+      <arg name="use_sim_time" value="$(arg use_sim_time)" />
+      <arg name="headless" value="$(arg headless)" />
+      <arg name="world_name" value="$(arg world_name)" />
+    </include>
+
+    <include file="$(find cpr_agriculture_gazebo)/launch/spawn_$(arg platform).launch">
+      <arg name="x" value="$(arg x)"/>
+      <arg name="y" value="$(arg y)"/>
+      <arg name="z" value="$(arg z)"/>
+      <arg name="yaw" value="$(arg yaw)"/>
+    </include>
+
+</launch>

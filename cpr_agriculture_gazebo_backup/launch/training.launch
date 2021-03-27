@@ -1,0 +1,12 @@
+<launch>
+
+   <arg name="run_num" default="960"/>
+   <arg name="angle" default="0"/>
+   <arg name="safety_threshold" default="0.5"/>
+   <node pkg="capstone_nodes" type="training.py" name="training" output="screen">		
+		<rosparam subst_value="true"> run: $(arg run_num) </rosparam>
+		<rosparam subst_value="true"> angle: $(arg angle) </rosparam>
+		<rosparam subst_value="true"> safety_threshold: $(arg safety_threshold) </rosparam>
+    </node>
+
+</launch>
