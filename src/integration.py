@@ -26,6 +26,8 @@ v_odom = 0.0
 yaw_gazebo = 0.0
 RAMP_UP = False
 RAMP_DOWN = False
+REPLAN1 = 0
+REPLAN2 = 0
 MIN_VEL = 0.1
 MAX_VEL = 2.0
 first_run = 1
@@ -105,25 +107,27 @@ def robotAtGoal(robx, roby, goalx, goaly, tol):
     return val <= distance_tolerance
 
 def determineRamp(robx, roby,  tol):
-	global ramp_ang, ramp_len
+	global ramp_ang, ramp_len, RAMP_UP, RAMP_DOWN, REPLAN1, REPLAN2
 	
-	if abs(robx-56.8) < tol and roby > 40:
+	if abs(robx-56.8) < tol and roby > 40 and roby < 55:
 		#print("First up ramp")
+		REPLAN2 = REPLAN2 + 1
 		RAMP_UP = True
 		ramp_ang = 0.4
 		ramp_len = 3
-	elif abs(robx-30) < tol and roby > 40:
+	elif abs(robx-30) < tol and roby > 40 and roby < 55:
 		#print("Second up ramp")
+		REPLAN1 = REPLAN1 + 1
 		RAMP_UP = True
 		ramp_ang = 0.6
 		ramp_len = 1.5
-	elif abs(robx-20) < tol and roby > 40:
+	elif abs(robx-20) < tol and roby > 40 and roby < 55:
 		#print("First down ramp")
 		RAMP_DOWN = True
 		RAMP_UP = False
 		ramp_ang = -0.6
 		ramp_len = 1
-	elif abs(robx-10) < tol and roby > 40:
+	elif abs(robx-10) < tol and roby > 40 and roby < 55:
 		#print("Second down ramp")
 		RAMP_DOWN = True
 		ramp_ang = -0.4
@@ -225,11 +229,13 @@ def calculate_checkcount(mu):
         return 20
 
 def find_ramp_velocity(mu, length, ang): 
-	result = 0
+	result = 0.0
 	pred = success_model.predict([[mu,length,ang]]) [0][0]
 	print(pred)
 	if pred > 0.5: 
 		result = ramp_model.predict([[mu,length,ang]])[0][0]
+		print(result)
+		result = 0.5
 	return result
 
 def main(mu, safety_tol):
@@ -261,12 +267,25 @@ def main(mu, safety_tol):
     #waypoints2 = [(0,0), (10,0), (20, 10), (30, 10), (10, 20), (-20,20)]
     
     # test_world 3m
-    waypoints = [(21.5,-1.7), (46,22.675),(46, -1.7), (65, -1.7),(65, 33.5),(55.9,49.3),(-14, 49.3),(-14, -1.7)]
-    waypoints2 = [(0,-1.7), (21.5,-1.7), (46,22.675),(46, -1.7), (65, -1.7),(65, 33.5),(55.9,49.3),(-14, 49.3),(-14, -1.7)]
+    #waypoints = [(21.5,-1.7), (46,22.675),(46, -1.7), (65, -1.7),(65, 33.5),(55.9,49.3),(-14, 49.3),(-14, -1.7)]
+    #waypoints2 = [(0,-1.7), (21.5,-1.7), (46,22.675),(46, -1.7), (65, -1.7),(65, 33.5),(55.9,49.3),(-14, 49.3),(-14, -1.7)]
     
-    # test_world 1m
-    # waypoints = [(22.5,-3.7),(44,17.675),(44,-3.7), (67,-3.7),(67,34.75),(57.5,51.3),(-16,51.3),(-16,-3.7)]
-    # waypoints2 = [(0,-3.7), (22.5,-3.7),(44,17.675),(44,-3.7), (67,-3.7),(67,34.75),(57.5,51.3),(-16,51.3),(-16,-3.7)]
+    # test_world 1m    
+    waypointss1 = [(22.5,-3.7),(44,17.675),(44,-3.7), (67,-3.7),(67,34.75),(57.5,51.3),(-16,51.3),(-16,-3.7)]
+    waypointss1b = [(0,-3.7), (22.5,-3.7),(44,17.675),(44,-3.7), (67,-3.7),(67,34.75),(57.5,51.3),(-16,51.3),(-16,-3.7)]
+    
+    waypointss2 = [(22.5,-3.7),(44,17.675),(44,-3.7), (67,-3.7),(67,34.75),(57.5,51.3),(25,51.3),(25,31.3),(11,31.3),(11,51.3),(-16,51.3),(-16,-3.7)]
+    waypointss2b =[(0,-3.7), (22.5,-3.7),(44,17.675),(44,-3.7), (67,-3.7),(67,34.75),(57.5,51.3),(25,51.3),(25,31.3),(11,31.3),(11,51.3),(-16,51.3),(-16,-3.7)]
+    
+    waypointss3 = [(22.5,-3.7),(44,17.675),(44,-3.7), (67,-3.7),(67,34.75),(57.5,51.3),(44,51.3),(44,59),(-16,59),(-16,-3.7)]
+    waypointss3b = [(0,-3.7), (22.5,-3.7),(44,17.675),(44,-3.7), (67,-3.7),(67,34.75),(57.5,51.3),(44,51.3),(44,59),(-16,59),(-16,-3.7)]
+   
+    obstacle1 = 0
+    obstacle2 = 0
+    path_choices = [[1, waypointss1, waypointss1b], [2, waypointss2, waypointss2b], [3, waypointss3, waypointss3b]]
+
+    waypoints = path_choices[0][1]
+    waypoints2 = path_choices[0][2]
     
     space = 0.1
     path = injectPoints(waypoints2, space)
@@ -311,9 +330,7 @@ def main(mu, safety_tol):
             velocity_publisher.publish(vel_msg)
             break
 	
-	determineRamp(x, y, safety_tol)
-        if (RAMP_UP == True) or (RAMP_DOWN == True):
-		vel_bound = find_ramp_velocity(mu, ramp_len, ramp_ang)
+        determineRamp(x, y, safety_tol)
         	
         lookAheadIndex = getLookAheadPoint(path, x, y, lastLookAhead)
         lookAheadPoint = path[lookAheadIndex]
@@ -377,18 +394,35 @@ def main(mu, safety_tol):
             vel = max(last_vel, MIN_VEL)
         
         #print(vel, big_ang, closest_index)
+        
+
 
         if (RAMP_UP == True) or (RAMP_DOWN == True):
-		vel_bound = find_ramp_velocity(mu, length, ramp_ang)
-		if vel_bound == 0:
-			#replan 
-			vel = 0
-        	elif (RAMP_UP == True):
-        		if vel < vel_bound:
-        			vel = vel_bound
-        	elif (RAMP_DOWN == True):
-        		if vel > vel_bound:
-        			vel = vel_bound
+            #print('ramp!')
+            vel_bound = find_ramp_velocity(mu, ramp_len, ramp_ang)
+            if vel_bound == 0:
+                #replan
+                if REPLAN1 == 1:
+                    print('replan!')
+                    waypoints = path_choices[1][1]
+                    waypoints2 = path_choices[1][2]
+                    path = injectPoints(waypoints2, space)
+                    path_predict = injectPoints(waypoints2, 0.5)
+                    smooth_path = smoothPath(path)
+                elif REPLAN2 == 1:
+                    print('replan 2!')
+                    waypoints = path_choices[2][1]
+                    waypoints2 = path_choices[2][2]
+                    path = injectPoints(waypoints2, space)
+                    path_predict = injectPoints(waypoints2, 0.5)
+                    smooth_path = smoothPath(path)
+                    
+            elif (RAMP_UP == True):
+                if vel < vel_bound:
+		            vel = vel_bound
+            elif (RAMP_DOWN == True):
+                if vel > vel_bound:
+                    vel = vel_bound
         
 
         theta_d = atan2(goal_pose_y - y, goal_pose_x - x)
@@ -447,7 +481,7 @@ def main(mu, safety_tol):
 
 if __name__ == "__main__":
     rospy.init_node('capstone_nodes', anonymous=True)
-    mu = 1.0
+    mu = 1
     safety_tol = 1
     env = environments[mu]
     main(mu, safety_tol)

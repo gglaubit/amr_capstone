@@ -205,9 +205,21 @@ def main(mu, safety_tol):
 
     # test_world
     #waypoints = [(0,-10)]
-    waypoints = [(23,-1.7), (46,21.225),(46, -1.7), (65, -1.7),(65, 38.75),(56.8,49.3),(-14, 49.3),(-14, -1.7)]
-    waypoints2 = [(0,-1.7), (23,-1.7), (46,21.225),(46, -1.7), (65, -1.7),(65, 38.75),(56.8,49.3),(-14, 49.3),(-14, -1.7)]
+    waypointss1 = [(10,0), (10, 5), (0, 5)]
+    waypointss1b = [(0,0), (10,0), (10, 5), (0, 5)]
+    
+    waypointss2 = [(10,0), (10, 5), (10, 10)]
+    waypointss2b = [(0,0), (10,0), (10, 5), (10,10)]
+    
+    waypointss3 = [(10,0), (10, 5), (20, 5)]
+    waypointss3b = [(0,0), (10,0), (10, 5), (20,5)]
+   
+    obstacle1 = 0
+    obstacle2 = 0
+    path_choices = [[1, waypointss1, waypointss1b], [2, waypointss2, waypointss2b], [3, waypointss3, waypointss3b]]
 
+    waypoints = path_choices[0][1]
+    waypoints2 = path_choices[0][2]
 
     space = 0.1
     path = injectPoints(waypoints2, space)
@@ -257,9 +269,30 @@ def main(mu, safety_tol):
         lastLookAhead = lookAheadIndex
         goal_pose_x = lookAheadPoint[0]
         goal_pose_y = lookAheadPoint[1]
-
-        closest_index = getClosestIndex(x, y, path_predict, safety_tol)
         
+        if robotAtGoal(x, y, 10, 5, 4):
+            obstacle1 = 1
+
+        if obstacle1:
+            waypoints = path_choices[1][1]
+            waypoints2 = path_choices[1][2]
+            path = injectPoints(waypoints2, space)
+            path_predict = injectPoints(waypoints2, 0.5)
+            smooth_path = smoothPath(path)
+            
+        #if robotAtGoal(x, y, 10, 10, 4):
+        #    obstacle2 = 1
+
+        if obstacle2:
+            waypoints = path_choices[2][1]
+            waypoints2 = path_choices[2][2]
+            path = injectPoints(waypoints2, space)
+            path_predict = injectPoints(waypoints2, 0.5)
+            smooth_path = smoothPath(path)
+            
+        print(waypoints)
+
+        closest_index = getClosestIndex(x, y, path_predict, safety_tol)        	
 
         horizon = 0
         while horizon < lookahead_num:
@@ -309,7 +342,7 @@ def main(mu, safety_tol):
         else:
             vel = last_vel
         
-        print(vel, ang)
+        #print(vel, ang)
         
 
         theta_d = atan2(goal_pose_y - y, goal_pose_x - x)
@@ -368,7 +401,7 @@ def main(mu, safety_tol):
 
 if __name__ == "__main__":
     rospy.init_node('capstone_nodes', anonymous=True)
-    mu = 0.05
+    mu = 1
     safety_tol = 1
     env = environments[mu]
     main(mu, safety_tol)
